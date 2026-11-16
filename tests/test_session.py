@@ -28,11 +28,15 @@ class Recognizer:
     def __init__(self):
         self.text = "private words"
         self.error = None
+        self.closed = False
 
     def transcribe(self, samples, paths, session_id):
         if self.error:
             raise RuntimeError("private words")
         return self.text
+
+    def close(self):
+        self.closed = True
 
 
 def setup_controller(tmp_path):
@@ -96,6 +100,11 @@ def test_session_transitions_timings_busy_and_one_id(tmp_path):
         "paste",
         "stop_to_insertion",
     }
+    assert any(
+        event.get("output_characters") == len("private words") for event in events
+    )
+    assert any(event.get("process_name") == "WindowsTerminal.exe" for event in events)
+    assert any(event.get("model") == "ggml-base.en.bin" for event in events)
     assert "private words" not in paths.log.read_text()
 
 
@@ -147,10 +156,11 @@ def test_silence_and_error_never_paste(tmp_path):
 
 
 def test_shutdown_while_processing_ignores_late_completion(tmp_path):
-    ctl, rec, _, _, _, work, ui, pastes, _, _ = setup_controller(tmp_path)
+    ctl, rec, recognizer, _, _, work, ui, pastes, _, _ = setup_controller(tmp_path)
     ctl.on_hotkey()
     ctl.on_hotkey()
     ctl.close()
+    assert recognizer.closed
     finish_work(work, ui)
     assert not pastes
     assert rec.stops == 1

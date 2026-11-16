@@ -1,3 +1,5 @@
+"""Write strictly allowlisted local diagnostic events."""
+
 import json
 import logging
 import re
@@ -28,9 +30,25 @@ _STRING_VALUES = {
     },
 }
 _TOKEN = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+_EVENTS = {
+    "mic_open",
+    "recording",
+    "audio",
+    "wav_write",
+    "cli_start",
+    "inference",
+    "focus_check",
+    "clipboard_write",
+    "paste",
+    "stop_to_insertion",
+    "error",
+    "result",
+    "target",
+}
 
 
 def make_logger(path: Path) -> logging.Logger:
+    """Create a five-file rotating JSON-lines logger."""
     path.parent.mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger(f"yat.{path.resolve()}")
     logger.setLevel(logging.INFO)
@@ -47,7 +65,8 @@ def make_logger(path: Path) -> logging.Logger:
 def log_event(
     logger: logging.Logger, session_id: str, event: str, **metrics: float | str
 ) -> None:
-    if not _TOKEN.fullmatch(session_id) or not _TOKEN.fullmatch(event):
+    """Write one event after rejecting non-allowlisted metadata."""
+    if not _TOKEN.fullmatch(session_id) or event not in _EVENTS:
         raise ValueError("Invalid event identity")
     for key, value in metrics.items():
         if key in _NUMERIC_FIELDS:

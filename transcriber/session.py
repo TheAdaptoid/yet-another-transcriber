@@ -3,7 +3,7 @@
 import time
 import uuid
 
-from transcriber.config import MAX_SECONDS, SAMPLE_RATE
+from transcriber.config import MAX_SECONDS, MODEL_NAME, SAMPLE_RATE
 from transcriber.diagnostics import log_event
 from transcriber.insertion import WindowsInsertion, paste_text, safe_text
 from transcriber.targets import capture_target, still_focused
@@ -74,6 +74,13 @@ class SessionController:
         self.session_id = uuid.uuid4().hex
         try:
             self.target = self.capture()
+            if self.target is not None:
+                process = (
+                    "WindowsTerminal.exe"
+                    if self.target.kind == "terminal"
+                    else "Obsidian.exe"
+                )
+                log_event(self.logger, self.session_id, "target", process_name=process)
             started = self.clock()
             self.recorder.start()
             self._event("mic_open", started)
@@ -154,6 +161,13 @@ class SessionController:
             self.state = "idle"
             self.show_state("idle", None)
             return
+        log_event(
+            self.logger,
+            self.session_id,
+            "result",
+            output_characters=len(text),
+            model=MODEL_NAME,
+        )
         self.state = "inserting"
         target = self.target
         started = self.clock()
@@ -195,4 +209,5 @@ class SessionController:
         self.generation += 1
         if self.state == "recording":
             self.recorder.close()
+        self.recognizer.close()
         self.state = "idle"

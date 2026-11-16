@@ -1,3 +1,5 @@
+"""Capture bounded mono audio and manage temporary WAV files."""
+
 import tempfile
 import threading
 import wave
@@ -10,7 +12,10 @@ from transcriber.config import MAX_SECONDS, SAMPLE_RATE
 
 
 class Recorder:
+    """Capture samples in memory, rejecting stale stream callbacks."""
+
     def __init__(self, stream_factory=sd.InputStream):
+        """Initialize the recorder with an injectable stream factory."""
         self._stream_factory = stream_factory
         self._lock = threading.Lock()
         self._generation = 0
@@ -20,6 +25,7 @@ class Recorder:
         self._stream = None
 
     def start(self):
+        """Start one capture stream."""
         with self._lock:
             if self._active:
                 raise RuntimeError("Already recording")
@@ -50,6 +56,7 @@ class Recorder:
             raise
 
     def stop(self):
+        """Stop the stream and return a copy of the recorded samples."""
         with self._lock:
             self._active = False
             chunks = self._chunks
@@ -63,10 +70,12 @@ class Recorder:
         return np.concatenate(chunks).copy() if chunks else np.empty(0, dtype=np.int16)
 
     def close(self):
+        """Close the current stream if one is active."""
         self.stop()
 
 
 def write_temp_wav(samples: np.ndarray, directory: Path) -> Path:
+    """Write the provided signed PCM samples to an owned temporary WAV."""
     directory.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         prefix="yat-", suffix=".wav", dir=directory, delete=False
@@ -85,6 +94,7 @@ def write_temp_wav(samples: np.ndarray, directory: Path) -> Path:
 
 
 def cleanup_temp_wavs(directory: Path) -> None:
+    """Remove only WAV files owned by this application."""
     if directory.exists():
         for path in directory.glob("yat-*.wav"):
             if path.is_file():

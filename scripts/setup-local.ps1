@@ -25,6 +25,10 @@ $release = Join-Path $source "build/bin/Release"
 if (-not (Test-Path "$release/whisper-cli.exe")) { throw "CLI missing after build" }
 Copy-Item "$release/*.exe" $bin -Force
 Copy-Item "$release/*.dll" $bin -Force
+$versionText = & "$bin/whisper-cli.exe" --version
+if ($LASTEXITCODE -ne 0 -or "$versionText" -notmatch "1\.9\.5") {
+    throw "Built CLI did not report version 1.9.5"
+}
 $model = Join-Path $models "ggml-base.en.bin"
 $download = "$model.download"
 Invoke-WebRequest "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin" -OutFile $download

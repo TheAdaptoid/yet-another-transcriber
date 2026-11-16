@@ -1,5 +1,6 @@
 import json
 import subprocess
+import threading
 import wave
 
 import numpy as np
@@ -94,6 +95,12 @@ def test_silence_never_launches_cli(tmp_path):
     recognizer = Recognizer(make_logger(paths.log), popen=fail)
     assert recognizer.transcribe(np.array([], dtype=np.int16), paths, "a") == ""
     assert recognizer.transcribe(np.zeros(800, dtype=np.int16), paths, "a") == ""
+    assert (
+        recognizer.transcribe(
+            np.tile(np.array([-3, 4], dtype=np.int16), 400), paths, "a"
+        )
+        == ""
+    )
 
 
 def test_recognition_logs_only_metrics_and_cleans_wave(tmp_path):
@@ -165,3 +172,55 @@ def test_recognition_failure_is_categorized_and_removes_wav(tmp_path, mode):
     )
     assert not list(paths.tmp.glob("yat-*.wav"))
     assert "secret speech" not in paths.log.read_text()
+
+
+def test_wave_is_removed_even_when_diagnostics_fail(tmp_path, monkeypatch):
+    from transcriber import recognizer as module
+
+    paths = Paths.for_home(tmp_path)
+
+    def broken_log(*args, **kwargs):
+        raise OSError("log failed")
+
+    monkeypatch.setattr(module, "log_event", broken_log)
+    recognizer = Recognizer(make_logger(paths.log))
+    with pytest.raises(OSError):
+        recognizer.transcribe(np.array([1000], dtype=np.int16), paths, "a")
+    assert not list(paths.tmp.glob("yat-*.wav"))
+
+
+def test_close_terminates_inflight_recognizer(tmp_path):
+    paths = Paths.for_home(tmp_path)
+    paths.cli.parent.mkdir(parents=True)
+    paths.cli.touch()
+    started = threading.Event()
+    killed = threading.Event()
+
+    class Process:
+        returncode = 1
+
+        def communicate(self, timeout=None):
+            started.set()
+            assert killed.wait(3)
+            return "", ""
+
+        def kill(self):
+            killed.set()
+
+    recognizer = Recognizer(make_logger(paths.log), popen=lambda *a, **kw: Process())
+    errors = []
+
+    def transcribe():
+        try:
+            recognizer.transcribe(np.array([1000], dtype=np.int16), paths, "a")
+        except RecognitionError as exc:
+            errors.append(exc.category)
+
+    thread = threading.Thread(target=transcribe)
+    thread.start()
+    assert started.wait(3)
+    recognizer.close()
+    thread.join(3)
+    assert not thread.is_alive()
+    assert killed.is_set()
+    assert not list(paths.tmp.glob("yat-*.wav"))

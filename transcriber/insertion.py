@@ -56,11 +56,23 @@ class _Input(ctypes.Structure):
     _fields_ = [("type", wintypes.DWORD), ("value", _InputUnion)]
 
 
+def _open_clipboard(owner: int) -> bool:
+    user32 = ctypes.windll.user32
+    user32.OpenClipboard.argtypes = [wintypes.HWND]
+    return bool(user32.OpenClipboard(owner))
+
+
 class WindowsInsertion:
     """Win32 Unicode clipboard and keyboard operations."""
 
+    def __init__(self, owner: int | None = None):
+        """Bind clipboard ownership to a window belonging to this process."""
+        self.owner = owner
+
     def set_clipboard(self, text: str) -> bool:
         """Set CF_UNICODETEXT and transfer the allocated memory to Windows."""
+        if not self.owner:
+            return False
         user32 = ctypes.windll.user32
         kernel = ctypes.windll.kernel32
         kernel.GlobalAlloc.argtypes = [wintypes.UINT, ctypes.c_size_t]
@@ -82,7 +94,7 @@ class WindowsInsertion:
                 return False
             ctypes.memmove(ptr, data, len(data))
             kernel.GlobalUnlock(handle)
-            if not user32.OpenClipboard(None):
+            if not _open_clipboard(self.owner):
                 return False
             try:
                 if not user32.EmptyClipboard():

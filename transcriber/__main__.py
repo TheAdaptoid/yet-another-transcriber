@@ -13,6 +13,7 @@ from transcriber.config import Paths
 from transcriber.diagnostics import make_logger
 from transcriber.hotkey import HotkeyListener
 from transcriber.indicator import Indicator
+from transcriber.insertion import WindowsInsertion, paste_text
 from transcriber.recognizer import Recognizer
 from transcriber.session import SessionController
 
@@ -82,6 +83,10 @@ class Runtime:
                 "error", "Local model or speech engine missing or invalid. Run setup."
             )
             return False
+
+        def insertion_api():
+            return WindowsInsertion(owner=self.indicator.clipboard_owner())
+
         self.controller = SessionController(
             paths=self.paths,
             logger=logger,
@@ -91,6 +96,10 @@ class Runtime:
             schedule=lambda seconds, fn: self.loop.after(int(seconds * 1000), fn),
             worker=lambda fn: threading.Thread(target=fn, daemon=True).start(),
             post=self.queue.put,
+            copy=lambda text: insertion_api().set_clipboard(text),
+            paste=lambda text, **kwargs: paste_text(
+                text, api=insertion_api(), **kwargs
+            ),
         )
         controller = self.controller
         try:

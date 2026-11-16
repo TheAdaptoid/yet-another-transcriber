@@ -1,3 +1,5 @@
+"""Fixed settings and per-user storage locations."""
+
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -8,6 +10,8 @@ MODEL_NAME = "ggml-base.en.bin"
 
 @dataclass(frozen=True)
 class Paths:
+    """App-specific data paths under a single user profile."""
+
     root: Path
     model: Path
     cli: Path
@@ -16,6 +20,7 @@ class Paths:
 
     @classmethod
     def for_home(cls, home: Path) -> "Paths":
+        """Create app paths without creating files or directories."""
         root = home / ".yat"
         return cls(
             root=root,

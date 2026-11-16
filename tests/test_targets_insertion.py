@@ -71,3 +71,14 @@ def test_focus_exception_fails_closed():
 
     assert not insertion.paste_text("saved", guard=failed_guard, api=win)
     assert win.keys == []
+
+
+def test_clipboard_open_uses_owned_window_not_null(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        insertion, "_open_clipboard", lambda owner: calls.append(owner) or False
+    )
+    assert not insertion.WindowsInsertion(owner=123).set_clipboard("content")
+    assert calls == [123]
+    assert not insertion.WindowsInsertion().set_clipboard("content")
+    assert calls == [123]

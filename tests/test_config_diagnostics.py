@@ -44,3 +44,10 @@ def test_rejects_exception_as_category(tmp_path):
     with pytest.raises(ValueError):
         log_event(logger, "abc", "error", error_category="dictated secret words")
     assert "dictated secret words" not in (tmp_path / "app.jsonl").read_text()
+
+
+def test_rejects_content_in_event_name(tmp_path):
+    logger = make_logger(tmp_path / "app.jsonl")
+    with pytest.raises(ValueError):
+        log_event(logger, "abc", "secretword", duration_ms=1)
+    assert "secretword" not in (tmp_path / "app.jsonl").read_text()

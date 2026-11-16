@@ -27,7 +27,14 @@ class _TkOverlay:
 
     def _copy(self):
         if self.text:
-            WindowsInsertion().set_clipboard(self.text)
+            WindowsInsertion(owner=self.clipboard_owner()).set_clipboard(self.text)
+
+    def clipboard_owner(self):
+        self.root.update_idletasks()
+        user32 = ctypes.windll.user32
+        user32.GetParent.argtypes = [wintypes.HWND]
+        user32.GetParent.restype = wintypes.HWND
+        return user32.GetParent(self.root.winfo_id()) or self.root.winfo_id()
 
     def present(self, state, text):
         self.text = text if state == "copy" else None
@@ -50,9 +57,7 @@ class _TkOverlay:
         y = max(0, self.root.winfo_screenheight() - height - 60)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         user32 = ctypes.windll.user32
-        user32.GetParent.argtypes = [wintypes.HWND]
-        user32.GetParent.restype = wintypes.HWND
-        hwnd = user32.GetParent(self.root.winfo_id()) or self.root.winfo_id()
+        hwnd = self.clipboard_owner()
         get_long = user32.GetWindowLongPtrW
         get_long.argtypes = [wintypes.HWND, ctypes.c_int]
         get_long.restype = ctypes.c_ssize_t
@@ -99,3 +104,7 @@ class Indicator:
     def close(self):
         """Destroy the overlay."""
         self.adapter.close()
+
+    def clipboard_owner(self):
+        """Return the app-owned native window used for clipboard ownership."""
+        return self.adapter.clipboard_owner()
