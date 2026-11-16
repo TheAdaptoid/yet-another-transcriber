@@ -22,8 +22,13 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 ## Observations in this development environment
 
 - Win+Alt+S registration and unregistration: passed as an isolated Windows API check.
+- A second registration of Win+Alt+S while the first was held failed as expected.
 - A Tk error overlay was visible without changing the foreground window.
 - Setup was attempted but CMake was unavailable. The model and CLI were not installed or verified.
+- Windows Terminal, Obsidian, OpenCode, and a default input device are present.
+  Dictation was not attempted in existing user windows or documents; the
+  target-app, microphone, and offline checks still require a controlled manual
+  session.
 
 ## Latency observations
 

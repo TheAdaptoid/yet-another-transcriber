@@ -46,10 +46,20 @@ class Recognizer:
                     self._process.kill()
                 except OSError:
                     pass
-        self._done.wait(timeout=3)
+        self._done.wait()
 
     def transcribe(self, samples: np.ndarray, paths: Paths, session_id: str) -> str:
         """Transcribe samples and always remove the temporary WAV."""
+        with self._lock:
+            if self._closed:
+                raise RecognitionError("cli_failed")
+            self._done.clear()
+        try:
+            return self._transcribe(samples, paths, session_id)
+        finally:
+            self._done.set()
+
+    def _transcribe(self, samples: np.ndarray, paths: Paths, session_id: str) -> str:
         # A small PCM noise floor is not evidence of speech. This gate does
         # not replace voice activity detection in noisy rooms.
         if samples.size == 0 or np.max(np.abs(samples.astype(np.int32))) <= 64:
@@ -84,7 +94,6 @@ class Recognizer:
                 with self._lock:
                     if self._closed:
                         raise RecognitionError("cli_failed")
-                    self._done.clear()
                     process = self.popen(
                         args,
                         stdout=subprocess.PIPE,
@@ -131,4 +140,3 @@ class Recognizer:
             with self._lock:
                 self._process = None
             wav.unlink(missing_ok=True)
-            self._done.set()

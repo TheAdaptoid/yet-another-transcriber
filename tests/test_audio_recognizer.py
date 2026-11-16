@@ -224,3 +224,44 @@ def test_close_terminates_inflight_recognizer(tmp_path):
     assert not thread.is_alive()
     assert killed.is_set()
     assert not list(paths.tmp.glob("yat-*.wav"))
+
+
+def test_close_waits_for_wave_creation_to_finish(tmp_path, monkeypatch):
+    from transcriber import recognizer as module
+
+    paths = Paths.for_home(tmp_path)
+    entered = threading.Event()
+    release = threading.Event()
+    closed = threading.Event()
+    real_write = module.write_temp_wav
+
+    def slow_write(samples, directory):
+        entered.set()
+        assert release.wait(3)
+        return real_write(samples, directory)
+
+    monkeypatch.setattr(module, "write_temp_wav", slow_write)
+    recognizer = Recognizer(make_logger(paths.log))
+
+    def transcribe():
+        try:
+            recognizer.transcribe(np.array([1000], dtype=np.int16), paths, "a")
+        except RecognitionError:
+            pass
+
+    worker = threading.Thread(target=transcribe)
+    worker.start()
+    assert entered.wait(3)
+
+    def close():
+        recognizer.close()
+        closed.set()
+
+    closer = threading.Thread(target=close)
+    closer.start()
+    assert not closed.wait(0.1)
+    release.set()
+    closer.join(3)
+    worker.join(3)
+    assert closed.is_set()
+    assert not list(paths.tmp.glob("yat-*.wav"))

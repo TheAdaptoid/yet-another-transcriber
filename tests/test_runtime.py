@@ -1,13 +1,14 @@
 import hashlib
 import json
 import queue
+import tkinter as tk
 
 import pytest
 
 from transcriber import __main__ as runtime
 from transcriber.config import Paths
 from transcriber.hotkey import HotkeyListener
-from transcriber.indicator import Indicator
+from transcriber.indicator import Indicator, _TkOverlay
 
 
 class FakeHotkeyAPI:
@@ -73,6 +74,42 @@ def test_indicator_only_uses_nonactivating_overlay():
     assert [event[0] for event in overlay.events] == ["noactivate"] * 4 + ["hide"]
     indicator.close()
     assert overlay.events[-1] == ("close",)
+
+
+def test_fallback_text_can_be_selected_and_copy_failure_is_visible(monkeypatch):
+    from transcriber import indicator as module
+
+    class FailingClipboard:
+        def __init__(self, **kwargs):
+            pass
+
+        def set_clipboard(self, text):
+            return False
+
+    monkeypatch.setattr(module, "WindowsInsertion", FailingClipboard)
+    root = tk.Tk()
+    try:
+        overlay = _TkOverlay(root, lambda: None)
+        overlay.present("copy", "private words")
+        overlay.transcript.tag_add("sel", "1.0", "end-1c")
+        assert overlay.transcript.get("sel.first", "sel.last") == "private words"
+        overlay._copy()
+        assert "failed" in overlay.label.cget("text").lower()
+    finally:
+        root.destroy()
+
+
+def test_dismissing_fallback_does_not_exit():
+    root = tk.Tk()
+    closed = []
+    try:
+        overlay = _TkOverlay(root, lambda: closed.append(True))
+        overlay.present("error", "Error")
+        overlay.dismiss_button.invoke()
+        assert not closed
+        assert root.state() == "withdrawn"
+    finally:
+        root.destroy()
 
 
 def test_asset_validation_rejects_changes(tmp_path, monkeypatch):

@@ -164,3 +164,33 @@ def test_shutdown_while_processing_ignores_late_completion(tmp_path):
     finish_work(work, ui)
     assert not pastes
     assert rec.stops == 1
+
+
+def test_hotkeys_arriving_during_insertion_are_not_replayed(tmp_path):
+    ctl, rec, _, _, _, work, ui, _, _, _ = setup_controller(tmp_path)
+    queued_hotkeys = []
+
+    def paste_during_hotkey(text, **kwargs):
+        ctl.enqueue_hotkey(queued_hotkeys.append)
+        return True
+
+    ctl.paste = paste_during_hotkey
+    ctl.on_hotkey()
+    ctl.on_hotkey()
+    finish_work(work, ui)
+    for callback in queued_hotkeys:
+        callback()
+    assert ctl.state == "idle"
+    assert rec.starts == 1
+
+
+def test_old_queued_hotkey_is_invalidated_on_stop(tmp_path):
+    ctl, rec, _, _, _, work, ui, _, _, _ = setup_controller(tmp_path)
+    queued = []
+    ctl.on_hotkey()
+    ctl.enqueue_hotkey(queued.append)
+    ctl.on_hotkey()
+    finish_work(work, ui)
+    queued.pop()()
+    assert ctl.state == "idle"
+    assert rec.starts == 1

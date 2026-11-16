@@ -103,7 +103,7 @@ class Runtime:
         )
         controller = self.controller
         try:
-            self.listener.start(lambda: self.queue.put(controller.on_hotkey))
+            self.listener.start(lambda: controller.enqueue_hotkey(self.queue.put))
         except Exception:
             self.indicator.show("error", "Win+Alt+S could not be registered.")
             return False

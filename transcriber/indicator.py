@@ -20,14 +20,26 @@ class _TkOverlay:
             self.frame, bg="#222222", fg="white", justify="left", wraplength=380
         )
         self.label.pack(side="left")
+        self.transcript = tk.Text(
+            self.frame,
+            width=48,
+            height=6,
+            wrap="word",
+            state="disabled",
+            exportselection=False,
+        )
         self.copy_button = tk.Button(self.frame, text="Copy", command=self._copy)
-        self.close_button = tk.Button(self.frame, text="×", command=on_close)
+        self.dismiss_button = tk.Button(self.frame, text="Dismiss", command=self.hide)
+        self.close_button = tk.Button(self.frame, text="Exit", command=on_close)
         self.close_button.pack(side="right")
         self.text = None
 
     def _copy(self):
         if self.text:
-            WindowsInsertion(owner=self.clipboard_owner()).set_clipboard(self.text)
+            if WindowsInsertion(owner=self.clipboard_owner()).set_clipboard(self.text):
+                self.label.config(text="Copied. You can dismiss this result.")
+            else:
+                self.label.config(text="Copy failed. Select the text and try again.")
 
     def clipboard_owner(self):
         self.root.update_idletasks()
@@ -43,13 +55,23 @@ class _TkOverlay:
                 "recording": "Recording…  Win+Alt+S to stop",
                 "transcribing": "Transcribing…",
                 "error": text or "Dictation failed.",
-                "copy": "Could not paste. Copy this result:\n" + (text or ""),
+                "copy": "Could not paste. Select or copy this result.",
             }.get(state, state)
         )
         if state == "copy":
+            self.transcript.config(state="normal")
+            self.transcript.delete("1.0", "end")
+            self.transcript.insert("1.0", text or "")
+            self.transcript.config(state="disabled")
+            self.transcript.pack(side="bottom", fill="both", expand=True)
             self.copy_button.pack(side="right")
         else:
+            self.transcript.pack_forget()
             self.copy_button.pack_forget()
+        if state in {"copy", "error"}:
+            self.dismiss_button.pack(side="right")
+        else:
+            self.dismiss_button.pack_forget()
         self.root.update_idletasks()
         width = self.root.winfo_reqwidth()
         height = self.root.winfo_reqheight()

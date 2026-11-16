@@ -1,5 +1,6 @@
 """Coordinate one recording and guard every insertion."""
 
+import threading
 import time
 import uuid
 
@@ -50,6 +51,23 @@ class SessionController:
         self.closed = False
         self.record_start = 0.0
         self.stop_time = 0.0
+        self._hotkey_lock = threading.Lock()
+        self._hotkey_epoch = 0
+
+    def enqueue_hotkey(self, post):
+        """Discard presses received while busy, including delayed queue entries."""
+        with self._hotkey_lock:
+            if self.closed or self.state not in {"idle", "recording"}:
+                return
+            epoch = self._hotkey_epoch
+
+        def deliver():
+            with self._hotkey_lock:
+                current = epoch == self._hotkey_epoch
+            if current:
+                self.on_hotkey()
+
+        post(deliver)
 
     def _event(self, event, started):
         log_event(
@@ -105,7 +123,9 @@ class SessionController:
             self._stop()
 
     def _stop(self):
-        self.state = "transcribing"
+        with self._hotkey_lock:
+            self.state = "transcribing"
+            self._hotkey_epoch += 1
         self.stop_time = self.clock()
         try:
             samples = self.recorder.stop()
