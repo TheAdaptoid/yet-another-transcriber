@@ -1,0 +1,58 @@
+import json
+import logging
+import re
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+from transcriber.config import MODEL_NAME
+
+_NUMERIC_FIELDS = {
+    "duration_ms",
+    "audio_duration_ms",
+    "output_characters",
+}
+_STRING_VALUES = {
+    "model": {MODEL_NAME},
+    "process_name": {"WindowsTerminal.exe", "Obsidian.exe"},
+    "error_category": {
+        "microphone",
+        "model",
+        "cli_missing",
+        "cli_failed",
+        "cli_timeout",
+        "focus",
+        "clipboard",
+        "paste",
+        "hotkey",
+        "unknown",
+    },
+}
+_TOKEN = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+
+
+def make_logger(path: Path) -> logging.Logger:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger(f"yat.{path.resolve()}")
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    if not logger.handlers:
+        handler = RotatingFileHandler(
+            path, maxBytes=5 * 1024 * 1024, backupCount=4, encoding="utf-8"
+        )
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        logger.addHandler(handler)
+    return logger
+
+
+def log_event(
+    logger: logging.Logger, session_id: str, event: str, **metrics: float | str
+) -> None:
+    if not _TOKEN.fullmatch(session_id) or not _TOKEN.fullmatch(event):
+        raise ValueError("Invalid event identity")
+    for key, value in metrics.items():
+        if key in _NUMERIC_FIELDS:
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError("Invalid numeric metric")
+        elif key not in _STRING_VALUES or value not in _STRING_VALUES[key]:
+            raise ValueError("Invalid metric")
+    logger.info(json.dumps({"session_id": session_id, "event": event, **metrics}))
