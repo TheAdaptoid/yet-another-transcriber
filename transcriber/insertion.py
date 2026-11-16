@@ -2,6 +2,7 @@
 
 import ctypes
 import re
+import time
 import unicodedata
 from ctypes import wintypes
 from typing import Callable, Literal
@@ -113,11 +114,16 @@ def paste_text(
     *,
     guard: Callable[[], bool] | None = None,
     api: WindowsInsertion | None = None,
+    on_clipboard: Callable[[float], None] | None = None,
 ) -> bool:
     """Put text on clipboard and paste only after a successful focus guard."""
     win = api or WindowsInsertion()
     try:
-        if not win.set_clipboard(text):
+        started = time.monotonic()
+        copied = win.set_clipboard(text)
+        if on_clipboard:
+            on_clipboard((time.monotonic() - started) * 1000)
+        if not copied:
             return False
         if guard is None or not guard():
             return False
