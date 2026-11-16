@@ -1,0 +1,170 @@
+import hashlib
+import json
+import queue
+
+import pytest
+
+from transcriber import __main__ as runtime
+from transcriber.config import Paths
+from transcriber.hotkey import HotkeyListener
+from transcriber.indicator import Indicator
+
+
+class FakeHotkeyAPI:
+    def __init__(self, succeed=True):
+        self.succeed = succeed
+        self.registered = None
+        self.unregistered = False
+        self.messages = queue.Queue()
+
+    def register(self, modifiers, key):
+        self.registered = (modifiers, key)
+        return self.succeed
+
+    def thread_id(self):
+        return 10
+
+    def next_message(self):
+        return self.messages.get(timeout=3)
+
+    def unregister(self):
+        self.unregistered = True
+
+    def quit(self, thread_id):
+        self.messages.put("quit")
+
+
+def test_hotkey_registration_and_unregistration():
+    api = FakeHotkeyAPI()
+    listener = HotkeyListener(api=api)
+    listener.start(lambda: None)
+    assert api.registered == (0x0008 | 0x0001, ord("S"))
+    listener.stop()
+    assert api.unregistered
+
+
+def test_hotkey_conflict_is_explicit():
+    listener = HotkeyListener(api=FakeHotkeyAPI(False))
+    with pytest.raises(RuntimeError, match="hotkey"):
+        listener.start(lambda: None)
+    listener.stop()
+
+
+class Overlay:
+    def __init__(self):
+        self.events = []
+
+    def present(self, state, text):
+        self.events.append(("noactivate", state, text))
+
+    def hide(self):
+        self.events.append(("hide",))
+
+    def close(self):
+        self.events.append(("close",))
+
+
+def test_indicator_only_uses_nonactivating_overlay():
+    overlay = Overlay()
+    indicator = Indicator(adapter=overlay)
+    for state in ("recording", "transcribing", "copy", "error"):
+        indicator.show(state, "example" if state == "copy" else None)
+    indicator.show("idle")
+    assert [event[0] for event in overlay.events] == ["noactivate"] * 4 + ["hide"]
+    indicator.close()
+    assert overlay.events[-1] == ("close",)
+
+
+def test_asset_validation_rejects_changes(tmp_path, monkeypatch):
+    paths = Paths.for_home(tmp_path)
+    paths.model.parent.mkdir(parents=True)
+    paths.cli.parent.mkdir(parents=True)
+    paths.model.write_bytes(b"model")
+    paths.cli.write_bytes(b"cli")
+    dll = paths.cli.parent / "whisper.dll"
+    dll.write_bytes(b"dll")
+
+    def digest(data):
+        return hashlib.sha256(data).hexdigest()
+
+    monkeypatch.setattr(runtime, "MODEL_SHA256", digest(b"model"))
+    (paths.cli.parent / "manifest.json").write_text(
+        json.dumps(
+            {
+                "version": "v1.9.5",
+                "source_commit": runtime.SOURCE_COMMIT,
+                "model_sha256": digest(b"model"),
+                "cli_sha256": digest(b"cli"),
+                "dll_sha256": {"whisper.dll": digest(b"dll")},
+            }
+        )
+    )
+    assert runtime.check_assets(paths)
+    paths.cli.write_bytes(b"tampered")
+    assert not runtime.check_assets(paths)
+    paths.cli.write_bytes(b"cli")
+    dll.unlink()
+    assert not runtime.check_assets(paths)
+
+
+def test_runtime_start_wires_queue_and_reports_registration_error(tmp_path):
+    paths = Paths.for_home(tmp_path)
+    paths.tmp.mkdir(parents=True)
+    orphan = paths.tmp / "yat-orphan.wav"
+    orphan.write_bytes(b"audio")
+    overlay = Overlay()
+    listener = FakeListener()
+    loop = FakeLoop()
+    app = runtime.Runtime(
+        paths=paths,
+        indicator=Indicator(adapter=overlay),
+        listener=listener,
+        loop=loop,
+        assets_ok=lambda paths: True,
+        recorder=FakeRecorder(),
+    )
+    assert app.start()
+    assert not orphan.exists()
+    listener.callback()
+    app.drain()
+    assert app.controller.state in {"recording", "idle"}
+    app.shutdown()
+    assert listener.stopped
+
+    bad = runtime.Runtime(
+        paths=paths,
+        indicator=Indicator(adapter=overlay),
+        listener=FakeListener(fail=True),
+        loop=FakeLoop(),
+        assets_ok=lambda paths: True,
+    )
+    assert not bad.start()
+    assert overlay.events[-1][1] == "error"
+
+
+class FakeListener:
+    def __init__(self, fail=False):
+        self.fail = fail
+        self.stopped = False
+        self.callback = None
+
+    def start(self, callback):
+        if self.fail:
+            raise RuntimeError("hotkey unavailable")
+        self.callback = callback
+
+    def stop(self):
+        self.stopped = True
+
+
+class FakeLoop:
+    def after(self, delay, callback):
+        pass
+
+
+class FakeRecorder:
+    def start(self):
+        pass
+
+    def close(self):
+        pass

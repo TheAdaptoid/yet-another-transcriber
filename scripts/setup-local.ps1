@@ -34,10 +34,15 @@ if ((Get-FileHash $download -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expe
 }
 Move-Item $download $model -Force
 $cliHash = (Get-FileHash "$bin/whisper-cli.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+$dllHashes = @{}
+Get-ChildItem "$release/*.dll" | ForEach-Object {
+    $dllHashes[$_.Name] = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+}
 @{
     version = "v1.9.5"
     source_commit = $commit
     model_sha256 = $expected
     cli_sha256 = $cliHash
+    dll_sha256 = $dllHashes
 } | ConvertTo-Json | Set-Content -Encoding utf8 "$bin/manifest.json"
 Write-Host "Installed whisper.cpp v1.9.5 CPU CLI and verified model."

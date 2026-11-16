@@ -76,9 +76,11 @@ def capture_target() -> TargetSnapshot | None:
         if not hwnd:
             return None
         process_name = _process_name(hwnd)
-        kind = {"windowsterminal.exe": "terminal", "obsidian.exe": "obsidian"}.get(
-            process_name.lower()
-        )
+        kinds: dict[str, Literal["terminal", "obsidian"]] = {
+            "windowsterminal.exe": "terminal",
+            "obsidian.exe": "obsidian",
+        }
+        kind = kinds.get(process_name.lower())
         if kind is None:
             return None
         runtime_id = _focused_runtime_id()
