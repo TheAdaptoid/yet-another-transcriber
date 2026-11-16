@@ -224,3 +224,4 @@ __marimo__/
 
 # Project Specific
 .superpowers/
+.worktrees/
