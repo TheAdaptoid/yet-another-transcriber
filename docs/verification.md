@@ -44,6 +44,11 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 - The recognizer returned a nonempty result for whisper.cpp's bundled JFK
   sample in 1.3 seconds on this PC. This is not a user-microphone latency
   measurement or a target-app verification.
+- With Silero VAD enabled, synthetic silence, two levels of random noise, and
+  a synthetic tone returned no transcript. The bundled speech sample returned
+  a nonempty transcript. These checks do not establish real-room accuracy.
+- The installed CLI returned an error for missing and corrupt VAD models.
+  Startup and each recognition call also check the VAD model hash.
 - In a scratch Obsidian note, the user reported that the indicator appeared and
   dictated text landed in the note. After focus moved to another application
   without a text field, the fallback appeared and the user copied and pasted

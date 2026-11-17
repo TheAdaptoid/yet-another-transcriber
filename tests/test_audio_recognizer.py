@@ -1,3 +1,4 @@
+import hashlib
 import json
 import subprocess
 import threading
@@ -10,6 +11,19 @@ from transcriber.audio import Recorder, cleanup_temp_wavs, write_temp_wav
 from transcriber.config import MAX_SECONDS, SAMPLE_RATE, Paths
 from transcriber.diagnostics import make_logger
 from transcriber.recognizer import RecognitionError, Recognizer
+
+
+@pytest.fixture(autouse=True)
+def vad_model(tmp_path, monkeypatch):
+    from transcriber import recognizer as module
+
+    path = Paths.for_home(tmp_path).vad_model
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"test-vad")
+    monkeypatch.setattr(
+        module, "VAD_SHA256", hashlib.sha256(b"test-vad").hexdigest(), raising=False
+    )
+    return path
 
 
 class FakeStream:
@@ -146,6 +160,8 @@ def test_recognition_logs_only_metrics_and_cleans_wave(tmp_path):
     assert args[args.index("-m") + 1] == str(paths.model)
     assert args[args.index("-l") + 1] == "en"
     assert all(flag in args for flag in ("-ng", "-np", "-nt"))
+    assert "--vad" in args
+    assert args[args.index("-vm") + 1] == str(paths.vad_model)
     assert not list(paths.tmp.glob("yat-*.wav"))
     log = paths.log.read_text()
     assert "dictated secret words" not in log
@@ -187,6 +203,58 @@ def test_recognition_failure_is_categorized_and_removes_wav(tmp_path, mode):
     )
     assert not list(paths.tmp.glob("yat-*.wav"))
     assert "secret speech" not in paths.log.read_text()
+
+
+@pytest.mark.parametrize("mutation", ["missing", "changed"])
+def test_invalid_vad_never_launches_cli(tmp_path, vad_model, mutation):
+    paths = Paths.for_home(tmp_path)
+    paths.cli.parent.mkdir(parents=True)
+    paths.cli.touch()
+    if mutation == "missing":
+        vad_model.unlink()
+    else:
+        vad_model.write_bytes(b"changed")
+
+    def fail(*args, **kwargs):
+        raise AssertionError("CLI must not launch")
+
+    recognizer = Recognizer(make_logger(paths.log), popen=fail)
+    with pytest.raises(RecognitionError) as exc:
+        recognizer.transcribe(np.array([1000], dtype=np.int16), paths, "a")
+    assert exc.value.category == "model"
+    assert not list(paths.tmp.glob("yat-*.wav"))
+
+
+def test_vad_cli_failure_never_returns_speech(tmp_path):
+    paths = Paths.for_home(tmp_path)
+    paths.cli.parent.mkdir(parents=True)
+    paths.cli.touch()
+
+    class Process:
+        returncode = 1
+
+        def communicate(self, timeout):
+            return ("private speech", "VAD failed private speech")
+
+    recognizer = Recognizer(make_logger(paths.log), popen=lambda *a, **kw: Process())
+    with pytest.raises(RecognitionError):
+        recognizer.transcribe(np.array([1000], dtype=np.int16), paths, "a")
+    assert "private speech" not in paths.log.read_text()
+
+
+def test_vad_empty_output_returns_no_speech(tmp_path):
+    paths = Paths.for_home(tmp_path)
+    paths.cli.parent.mkdir(parents=True)
+    paths.cli.touch()
+
+    class Process:
+        returncode = 0
+
+        def communicate(self, timeout):
+            return ("", "")
+
+    recognizer = Recognizer(make_logger(paths.log), popen=lambda *a, **kw: Process())
+    assert recognizer.transcribe(np.array([1000], dtype=np.int16), paths, "a") == ""
 
 
 def test_wave_is_removed_even_when_diagnostics_fail(tmp_path, monkeypatch):

@@ -1,5 +1,6 @@
 """Run the pinned local speech recognizer without logging speech."""
 
+import hashlib
 import logging
 import subprocess
 import threading
@@ -8,7 +9,7 @@ import time
 import numpy as np
 
 from transcriber.audio import write_temp_wav
-from transcriber.config import Paths
+from transcriber.config import VAD_SHA256, Paths
 from transcriber.diagnostics import log_event
 
 
@@ -59,7 +60,19 @@ class Recognizer:
         finally:
             self._done.set()
 
+    def _verify_vad(self, paths: Paths) -> None:
+        try:
+            with paths.vad_model.open("rb") as model:
+                valid_vad = (
+                    hashlib.file_digest(model, "sha256").hexdigest() == VAD_SHA256
+                )
+        except OSError:
+            valid_vad = False
+        if not valid_vad:
+            raise RecognitionError("model")
+
     def _transcribe(self, samples: np.ndarray, paths: Paths, session_id: str) -> str:
+        self._verify_vad(paths)
         # A small PCM noise floor is not evidence of speech. This gate does
         # not replace voice activity detection in noisy rooms.
         if samples.size == 0 or np.max(np.abs(samples.astype(np.int32))) <= 64:
@@ -88,6 +101,9 @@ class Recognizer:
                 "-ng",
                 "-np",
                 "-nt",
+                "--vad",
+                "-vm",
+                str(paths.vad_model),
             ]
             start = self.clock()
             try:
