@@ -24,7 +24,8 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 - [ ] **Partially verified:** before VAD, a quiet recording inserted a
   `[BLANK_AUDIO]` marker and synthetic noise produced hallucinated words.
   With Silero VAD, the user repeated a quiet five-second recording in OpenCode
-  and reported that the input remained empty. Real background-noise checks
+  and reported that the input remained empty. A separate recording with a small
+  fan and no speech also left the input empty. Other background-noise checks
   remain unverified.
 - [ ] **Partially verified:** the user reported that a normal short sentence and
   a separate short utterance appeared with their first and last words. The user
