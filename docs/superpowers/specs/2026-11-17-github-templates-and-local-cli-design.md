@@ -36,8 +36,10 @@ does not meet the goal of an installed command usable from any directory.
 
 1. Add a Python build backend and configure package discovery in
    `pyproject.toml`. Remove the setting that disables packaging.
-2. Add a `yat` console entry point and retain `python -m transcriber` for
-   existing users. Keep development dependencies out of the installed tool.
+2. Add a `yat` console entry point. Use Typer for the CLI and Rich for its
+   terminal output. Include both as runtime dependencies. Keep development
+   dependencies out of the installed tool. Do not require
+   `python -m transcriber` compatibility.
 3. Document local installation with `uv tool install` from a checkout, PATH
    setup with `uv tool update-shell` if needed, updates, and uninstall.
    Python dependencies may still come from their configured package sources;
