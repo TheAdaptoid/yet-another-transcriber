@@ -2,6 +2,7 @@
 
 import ctypes
 import tkinter as tk
+import tkinter.font as tkfont
 from ctypes import wintypes
 
 from transcriber.insertion import WindowsInsertion
@@ -84,8 +85,30 @@ class _TkOverlay:
         self.transcript.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
         self.transcript.pack(side="left", fill="both", expand=True)
-        separator = tk.Frame(paper, height=2, bg=_INK)
-        separator.pack(fill="x")
+        self.error_holder = tk.Frame(paper, bg=_INK, padx=2, pady=2)
+        self.error_details = tk.Text(
+            self.error_holder,
+            width=38,
+            height=4,
+            wrap="word",
+            state="disabled",
+            exportselection=False,
+            bg="#FFF8E6",
+            fg=_INK,
+            selectbackground=_INK,
+            selectforeground="#FFFFFF",
+            relief="flat",
+            borderwidth=0,
+            font=("Segoe UI", 10),
+        )
+        error_scrollbar = tk.Scrollbar(
+            self.error_holder, command=self.error_details.yview
+        )
+        self.error_details.configure(yscrollcommand=error_scrollbar.set)
+        error_scrollbar.pack(side="right", fill="y")
+        self.error_details.pack(side="left", fill="both", expand=True)
+        self.separator = tk.Frame(paper, height=2, bg=_INK)
+        self.separator.pack(fill="x")
         actions = tk.Frame(paper, bg=_PAPER, padx=10, pady=7)
         actions.pack(fill="x")
         button_style = {
@@ -114,6 +137,8 @@ class _TkOverlay:
         )
         self.close_button.pack(side="right")
         self.text = None
+        self.state = "idle"
+        self.error_text = None
 
     def _copy(self):
         if self.text:
@@ -130,6 +155,8 @@ class _TkOverlay:
         return user32.GetParent(self.root.winfo_id()) or self.root.winfo_id()
 
     def present(self, state, text):
+        self.state = state
+        self.error_text = text if state == "error" else None
         self.text = text if state == "copy" else None
         color = _STATE_COLORS.get(state, _STATE_COLORS["error"])
         self.ribbon.config(bg=color)
@@ -160,15 +187,75 @@ class _TkOverlay:
         else:
             self.transcript_holder.pack_forget()
             self.copy_button.pack_forget()
+        self.error_holder.pack_forget()
         if state in {"copy", "error"}:
             self.dismiss_button.pack(side="right")
         else:
             self.dismiss_button.pack_forget()
+        self._place()
+
+    def _work_area(self) -> tuple[int, int, int, int]:
+        rect = wintypes.RECT()
+        user32 = ctypes.windll.user32
+        system_parameters = user32.SystemParametersInfoW
+        system_parameters.argtypes = [
+            wintypes.UINT,
+            wintypes.UINT,
+            ctypes.c_void_p,
+            wintypes.UINT,
+        ]
+        system_parameters.restype = wintypes.BOOL
+        if system_parameters(0x0030, 0, ctypes.byref(rect), 0):
+            return rect.left, rect.top, rect.right, rect.bottom
+        return 0, 0, self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+
+    def _place(self) -> None:
+        left, top, right, bottom = self._work_area()
+        scale = self.root.winfo_fpixels("1i") / 96
+        margin = min(round(20 * scale), max(0, (right - left) // 10))
+        max_width = max(1, min(right - left - 2 * margin, round(385 * scale)))
+        max_height = max(1, bottom - top - 2 * margin)
+        text_font = tkfont.Font(font=self.transcript.cget("font"))
+        char_width = max(1, text_font.measure("0"))
+        line_height = max(1, text_font.metrics("linespace"))
+        text_columns = max(10, min(38, (max_width - 58) // char_width))
+        self.transcript.config(width=text_columns, height=6)
+        self.error_details.config(width=text_columns, height=4)
+        self.label.config(wraplength=max(80, max_width - 37))
         self.root.update_idletasks()
-        width = self.root.winfo_reqwidth()
-        height = self.root.winfo_reqheight()
-        x = max(0, self.root.winfo_screenwidth() - width - 20)
-        y = max(0, self.root.winfo_screenheight() - height - 60)
+
+        if self.state == "error" and self.root.winfo_reqheight() > max_height:
+            self.label.config(text="Dictation failed.")
+            self.error_details.config(state="normal")
+            self.error_details.delete("1.0", "end")
+            self.error_details.insert("1.0", self.error_text or "")
+            self.error_details.config(state="disabled")
+            self.error_holder.pack(
+                before=self.separator,
+                fill="both",
+                expand=True,
+                padx=12,
+                pady=(0, 8),
+            )
+            self.root.update_idletasks()
+            base_height = (
+                self.root.winfo_reqheight() - self.error_holder.winfo_reqheight()
+            )
+            lines = min(6, max(2, (max_height - base_height) // line_height))
+            self.error_details.config(height=lines)
+        elif self.state == "copy":
+            self.root.update_idletasks()
+            base_height = (
+                self.root.winfo_reqheight() - self.transcript_holder.winfo_reqheight()
+            )
+            lines = min(6, max(2, (max_height - base_height) // line_height))
+            self.transcript.config(height=lines)
+
+        self.root.update_idletasks()
+        width = min(max_width, self.root.winfo_reqwidth())
+        height = min(max_height, self.root.winfo_reqheight())
+        x = max(left, right - width - margin)
+        y = max(top, bottom - height - margin)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         user32 = ctypes.windll.user32
         hwnd = self.clipboard_owner()
