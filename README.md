@@ -1,6 +1,6 @@
-# Yet Another Transcriber
+# Yet Another Transcriber (YAT)
 
-**Speak locally. Paste deliberately.**
+**"We have WisperFlow at home"**
 
 Yet Another Transcriber is a small Windows dictation utility.
 Press **Win+Alt+S** to start recording.
