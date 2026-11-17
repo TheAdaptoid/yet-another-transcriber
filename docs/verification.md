@@ -12,7 +12,10 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 - [x] **Verified:** dictate into Obsidian and verify caret insertion.
 - [ ] **Not verified:** confirm UI Automation element identity remains stable in both applications.
 - [ ] **Not verified:** confirm no submission with Terminal multiline warnings enabled and disabled.
-- [ ] **Not verified:** switch to another field in the same app, then to another app; neither case auto-pastes.
+- [ ] **Not verified:** switch to another field in the same app; no auto-paste occurs.
+- [ ] **Partially verified:** switching to another app without a text field
+  produced a copyable fallback; switching to an editable field in another app
+  remains unverified.
 - [ ] **Not verified:** indicator never takes foreground while recording, processing, or showing a fallback in either target app.
 - [ ] **Not verified:** hotkey conflict, microphone failure, missing or invalid model, and clipboard or paste failures show an error or copyable transcript.
 - [ ] **Not verified:** a 60-second recording stops exactly once; shortcuts during transcription do nothing.
@@ -37,9 +40,9 @@ Do not record audio, transcripts, window titles, or clipboard content in results
   sample in 1.3 seconds on this PC. This is not a user-microphone latency
   measurement or a target-app verification.
 - In a scratch Obsidian note, the user reported that the indicator appeared and
-  dictated text landed in the note. When focus moved away before stopping,
-  the copyable-result fallback appeared. The destination of the focus change
-  and clipboard recovery have not yet been verified.
+  dictated text landed in the note. After focus moved to another application
+  without a text field, the fallback appeared and the user copied and pasted
+  its text into the scratch note.
 - Windows Terminal, Obsidian, OpenCode, and a default input device are present.
   OpenCode insertion, offline operation, and the remaining microphone and
   failure checks still require a controlled manual session.
