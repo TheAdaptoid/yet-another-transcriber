@@ -29,6 +29,8 @@ When Copy succeeds, the status reads `Copied. You can dismiss this result.`;
 when it fails, it reads `Copy failed. Select the text and try again.` The
 transcript stays intact in both cases. Dismiss hides the overlay without
 quitting; Exit closes the application via its existing callback.
+These actions are pointer-only: the non-activating overlay does not accept
+keyboard focus, so Tab cannot reach the buttons.
 
 ## Size, placement, and interaction
 

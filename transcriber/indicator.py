@@ -149,6 +149,7 @@ class _TkOverlay:
                 self.label.config(text="Copied. You can dismiss this result.")
             else:
                 self.label.config(text="Copy failed. Select the text and try again.")
+            self._place()
 
     def clipboard_owner(self):
         self.root.update_idletasks()

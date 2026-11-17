@@ -34,7 +34,7 @@ color. Never encode state only in hue or in an animation.
 - **Grouping:** ribbon content has 11 pixels of horizontal and 5 pixels of
   vertical inset. The message uses 12/9 pixels; actions use 10/4 pixels and
   sit below the separator. Buttons have a 2-pixel square border, 7/3 pixels
-  internal padding, and a visible keyboard focus highlight. Use breathing room
+  internal padding. Use breathing room
   between distinct groups, not between a label and its meaning.
 - **Motion:** a tiny ink mark moves horizontally for recording; three stepped
   bars cycle for transcribing. A Tk callback changes one step about every
@@ -44,9 +44,10 @@ color. Never encode state only in hue or in an animation.
   activity mark without scheduling a callback. Cancel pending motion when
   the state changes, hides, or closes.
 - **Contrast and focus:** test text against every accent, including selected
-  transcript text. Keep the native selectable Text and scrollbar, visible
-  button keyboard focus, and large enough button targets. The overlay must
-  never activate merely to display a new state.
+  transcript text. Keep the native selectable Text and scrollbar and large
+  enough button targets. The non-activating overlay's actions are pointer-only;
+  Tab cannot reach them. Other surfaces that support keyboard interaction need
+  a visible focus indicator. The overlay must never activate to display a state.
 
 ## Applying the system
 

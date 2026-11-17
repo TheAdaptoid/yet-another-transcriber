@@ -109,6 +109,49 @@ def _assert_within(root, area):
     assert x + width <= right and y + height <= bottom
 
 
+def _assert_visible_inside(root, widget):
+    assert widget.winfo_ismapped()
+    assert widget.winfo_rootx() >= root.winfo_rootx()
+    assert widget.winfo_rooty() >= root.winfo_rooty()
+    assert widget.winfo_rootx() + widget.winfo_width() <= (
+        root.winfo_rootx() + root.winfo_width()
+    )
+    assert widget.winfo_rooty() + widget.winfo_height() <= (
+        root.winfo_rooty() + root.winfo_height()
+    )
+
+
+def test_longer_copy_feedback_keeps_actions_visible(overlay, monkeypatch):
+    from transcriber import indicator
+
+    class Clipboard:
+        def __init__(self, *, owner):
+            pass
+
+        def set_clipboard(self, text):
+            return True
+
+    monkeypatch.setattr(indicator, "WindowsInsertion", Clipboard)
+    monkeypatch.setattr(overlay, "_work_area", lambda: (0, 0, 320, 270))
+    overlay.present("copy", "Sample result")
+    configure = overlay.label.config
+
+    def longer_feedback(**kwargs):
+        if kwargs.get("text") == "Copied. You can dismiss this result.":
+            kwargs["text"] = (
+                "Copied. You can dismiss this result. " * 2 + "Copied. You can dismiss"
+            )
+        return configure(**kwargs)
+
+    monkeypatch.setattr(overlay.label, "config", longer_feedback)
+    overlay.copy_button.invoke()
+    overlay.root.update()
+    for button in (overlay.copy_button, overlay.dismiss_button, overlay.close_button):
+        _assert_visible_inside(overlay.root, button)
+    _assert_visible_inside(overlay.root, overlay.transcript)
+    assert overlay.transcript.winfo_height() > 0
+
+
 def test_long_error_and_result_stay_within_work_area(overlay, monkeypatch):
     area = (0, 0, 480, 300)
     monkeypatch.setattr(overlay, "_work_area", lambda: area, raising=False)
@@ -163,13 +206,14 @@ def test_small_work_area_keeps_actions_and_text_readable(
         _assert_within(overlay.root, area)
         assert overlay.close_button.winfo_height() >= 25
         assert overlay.dismiss_button.winfo_height() >= 25
+        _assert_visible_inside(overlay.root, overlay.close_button)
+        _assert_visible_inside(overlay.root, overlay.dismiss_button)
         details = overlay.transcript if state == "copy" else overlay.error_details
         if state == "copy":
             assert overlay.copy_button.winfo_height() >= 25
-            overlay.label.config(text="Copy failed. Select the text and try again.")
-            overlay.root.update()
-            assert overlay.copy_button.winfo_height() >= 25
+            _assert_visible_inside(overlay.root, overlay.copy_button)
         assert details.winfo_height() >= 20
+        _assert_visible_inside(overlay.root, details)
         assert details.get("1.0", "end-1c") == text
         scrollbar = next(
             child
