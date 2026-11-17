@@ -1,4 +1,4 @@
-from transcriber import doctor
+from transcriber import doctor, microphones
 
 
 def test_doctor_success_without_opening_audio(monkeypatch):
@@ -7,11 +7,10 @@ def test_doctor_success_without_opening_audio(monkeypatch):
     monkeypatch.setattr(doctor.platform, "version", lambda: "10.0.26100")
     monkeypatch.setattr(doctor.sys, "version_info", (3, 13, 1))
     monkeypatch.setattr(doctor, "check_assets", lambda paths: True)
+    monkeypatch.setattr(microphones, "read_selection", lambda: None)
+    monkeypatch.setattr(microphones.sd, "check_input_settings", lambda **kwargs: None)
     monkeypatch.setattr(
-        doctor.sd, "query_devices", lambda **kwargs: {"max_input_channels": 1}
-    )
-    monkeypatch.setattr(
-        doctor.sd,
+        microphones.sd,
         "InputStream",
         lambda *a, **kw: (_ for _ in ()).throw(AssertionError()),
     )
@@ -26,7 +25,8 @@ def test_doctor_reports_missing_assets_and_microphone(monkeypatch):
     def missing(**kwargs):
         raise RuntimeError("device unavailable")
 
-    monkeypatch.setattr(doctor.sd, "query_devices", missing)
+    monkeypatch.setattr(microphones, "read_selection", lambda: None)
+    monkeypatch.setattr(microphones.sd, "check_input_settings", missing)
     monkeypatch.setattr(doctor, "check_shortcut", lambda: (None, "unknown"))
     checks = {name: (status, text) for name, status, text in doctor.run_checks()}
     assert checks["assets"][0] is False
