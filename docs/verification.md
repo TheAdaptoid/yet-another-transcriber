@@ -8,7 +8,8 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 
 - [x] **Verified:** build the pinned whisper.cpp v1.9.5 source with MSVC,
   verify model and binary hashes, and launch with the resulting assets.
-- [ ] **Not verified:** dictate into OpenCode in Windows Terminal and verify caret insertion.
+- [x] **Verified:** dictate into OpenCode in Windows Terminal and verify
+  editable insertion without submitting the prompt.
 - [x] **Verified:** dictate into Obsidian and verify caret insertion.
 - [ ] **Not verified:** confirm UI Automation element identity remains stable in both applications.
 - [ ] **Not verified:** confirm no submission with Terminal multiline warnings enabled and disabled.
@@ -47,6 +48,8 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 - The user also reported that the fallback appeared when focus moved from the
   scratch Obsidian note to the search field in the same window, and the search
   field remained unchanged.
+- In OpenCode running in Windows Terminal, the user reported that dictated text
+  appeared in the editable input and was not submitted.
 - Windows Terminal, Obsidian, OpenCode, and a default input device are present.
   OpenCode insertion, offline operation, and the remaining microphone and
   failure checks still require a controlled manual session.
