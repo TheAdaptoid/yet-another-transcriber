@@ -42,6 +42,19 @@ def test_states_have_distinct_ribbons_and_real_text(overlay):
     assert overlay.close_button.winfo_manager()
 
 
+def test_cancel_button_only_shown_for_active_states_and_invokes_callback(overlay):
+    calls = []
+    overlay.on_cancel = lambda: calls.append("cancel")
+    for state in ("recording", "transcribing"):
+        overlay.present(state, None)
+        assert overlay.cancel_button.winfo_manager()
+        overlay.cancel_button.invoke()
+    assert calls == ["cancel", "cancel"]
+    for state in ("error", "copy"):
+        overlay.present(state, None)
+        assert not overlay.cancel_button.winfo_manager()
+
+
 def test_error_uses_dynamic_text_and_keeps_actions(overlay):
     overlay.present("error", "Win+Alt+S could not be registered.")
     assert overlay.state_label.cget("text") == "ERROR"
@@ -119,6 +132,17 @@ def _assert_visible_inside(root, widget):
     assert widget.winfo_rooty() + widget.winfo_height() <= (
         root.winfo_rooty() + root.winfo_height()
     )
+
+
+@pytest.mark.parametrize("state", ["recording", "transcribing"])
+def test_cancel_and_exit_fit_in_small_work_area(overlay, monkeypatch, state):
+    area = (0, 0, 320, 270)
+    monkeypatch.setattr(overlay, "_work_area", lambda: area)
+    overlay.present(state, None)
+    overlay.root.update()
+    _assert_within(overlay.root, area)
+    _assert_visible_inside(overlay.root, overlay.cancel_button)
+    _assert_visible_inside(overlay.root, overlay.close_button)
 
 
 def test_longer_copy_feedback_keeps_actions_visible(overlay, monkeypatch):

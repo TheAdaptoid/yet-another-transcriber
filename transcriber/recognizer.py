@@ -50,6 +50,47 @@ class RecognitionError(Exception):
         self.category = category
 
 
+class Cancellation:
+    """Own cancellation and the process for one recognition invocation."""
+
+    def __init__(self):
+        """Create an independent cancellation handle."""
+        self._lock = threading.Lock()
+        self._canceled = False
+        self._process = None
+
+    def cancel(self):
+        """Mark this invocation canceled and terminate its process if present."""
+        with self._lock:
+            self._canceled = True
+            if self._process is not None:
+                try:
+                    self._process.kill()
+                except OSError:
+                    pass
+
+    def check(self):
+        """Raise if the invocation was canceled."""
+        with self._lock:
+            if self._canceled:
+                raise RecognitionError("canceled")
+
+    def register(self, process):
+        """Associate a process, terminating it if cancellation won the race."""
+        with self._lock:
+            self._process = process
+            if self._canceled:
+                try:
+                    process.kill()
+                except OSError:
+                    pass
+
+    def unregister(self):
+        """Release the process after it has been reaped."""
+        with self._lock:
+            self._process = None
+
+
 class Recognizer:
     """Run one offline CLI invocation per nonempty utterance."""
 
@@ -60,34 +101,42 @@ class Recognizer:
         self.logger = logger
         self.popen = popen
         self.clock = clock
-        self._lock = threading.Lock()
+        self._lock = threading.Condition()
         self._closed = False
-        self._process = None
-        self._done = threading.Event()
-        self._done.set()
+        self._active = set()
 
     def close(self):
         """Terminate a running CLI before the application exits."""
         with self._lock:
             self._closed = True
-            if self._process is not None:
-                try:
-                    self._process.kill()
-                except OSError:
-                    pass
-        self._done.wait()
+            active = tuple(self._active)
+        for cancellation in active:
+            cancellation.cancel()
+        with self._lock:
+            while self._active:
+                self._lock.wait()
 
-    def transcribe(self, samples: np.ndarray, paths: Paths, session_id: str) -> str:
+    def transcribe(
+        self,
+        samples: np.ndarray,
+        paths: Paths,
+        session_id: str,
+        cancellation: Cancellation | None = None,
+    ) -> str:
         """Transcribe samples and always remove the temporary WAV."""
+        cancellation = cancellation or Cancellation()
         with self._lock:
             if self._closed:
                 raise RecognitionError("cli_failed")
-            self._done.clear()
+            self._active.add(cancellation)
         try:
+            cancellation.check()
             with _lock_vad_file(paths):
-                return self._transcribe(samples, paths, session_id)
+                return self._transcribe(samples, paths, session_id, cancellation)
         finally:
-            self._done.set()
+            with self._lock:
+                self._active.remove(cancellation)
+                self._lock.notify_all()
 
     def _verify_vad(self, paths: Paths) -> None:
         try:
@@ -100,8 +149,15 @@ class Recognizer:
         if not valid_vad:
             raise RecognitionError("model")
 
-    def _transcribe(self, samples: np.ndarray, paths: Paths, session_id: str) -> str:
+    def _transcribe(
+        self,
+        samples: np.ndarray,
+        paths: Paths,
+        session_id: str,
+        cancellation: Cancellation,
+    ) -> str:
         self._verify_vad(paths)
+        cancellation.check()
         # A small PCM noise floor is not evidence of speech. This gate does
         # not replace voice activity detection in noisy rooms.
         if samples.size == 0 or np.max(np.abs(samples.astype(np.int32))) <= 64:
@@ -111,6 +167,7 @@ class Recognizer:
         process = None
         finished = False
         try:
+            cancellation.check()
             log_event(
                 self.logger,
                 session_id,
@@ -136,19 +193,17 @@ class Recognizer:
             ]
             start = self.clock()
             try:
-                with self._lock:
-                    if self._closed:
-                        raise RecognitionError("cli_failed")
-                    process = self.popen(
-                        args,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True,
-                        encoding="utf-8",
-                        errors="replace",
-                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                    )
-                    self._process = process
+                cancellation.check()
+                process = self.popen(
+                    args,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+                cancellation.register(process)
             except OSError:
                 raise RecognitionError("cli_missing") from None
             log_event(
@@ -183,6 +238,5 @@ class Recognizer:
                     process.communicate()
                 except OSError:
                     pass
-            with self._lock:
-                self._process = None
+            cancellation.unregister()
             wav.unlink(missing_ok=True)
