@@ -2,13 +2,20 @@
 name = "yet-another-transcriber"
 version = "0.1.0"
 requires-python = ">=3.13,<3.14"
-dependencies = ["sounddevice", "numpy", "comtypes"]
+dependencies = ["sounddevice", "numpy", "comtypes", "typer", "rich"]
 
 [dependency-groups]
 dev = ["pytest", "ruff", "ty"]
 
-[tool.uv]
-package = false
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["transcriber"]
+
+[project.scripts]
+yat = "transcriber.cli:app"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
