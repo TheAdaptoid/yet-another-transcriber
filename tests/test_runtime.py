@@ -17,6 +17,7 @@ class FakeHotkeyAPI:
         self.registered = None
         self.unregistered = False
         self.messages = queue.Queue()
+        self.held = False
 
     def register(self, modifiers, key):
         self.registered = (modifiers, key)
@@ -34,14 +35,38 @@ class FakeHotkeyAPI:
     def quit(self, thread_id):
         self.messages.put("quit")
 
+    def press(self):
+        if not self.held or not (self.registered[0] & 0x4000):
+            self.messages.put("hotkey")
+        self.held = True
+
+    def release(self):
+        self.held = False
+
 
 def test_hotkey_registration_and_unregistration():
     api = FakeHotkeyAPI()
     listener = HotkeyListener(api=api)
     listener.start(lambda: None)
-    assert api.registered == (0x0008 | 0x0001, ord("S"))
+    assert api.registered == (0x4000 | 0x0008 | 0x0001, ord("S"))
     listener.stop()
     assert api.unregistered
+
+
+def test_held_hotkey_does_not_repeat_but_next_press_is_delivered():
+    api = FakeHotkeyAPI()
+    listener = HotkeyListener(api=api)
+    presses = queue.Queue()
+    listener.start(lambda: presses.put("press"))
+    try:
+        api.press()
+        api.press()
+        api.press()
+        api.release()
+        api.press()
+    finally:
+        listener.stop()
+    assert list(presses.queue) == ["press", "press"]
 
 
 def test_hotkey_conflict_is_explicit():
