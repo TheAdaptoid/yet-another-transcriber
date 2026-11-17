@@ -47,6 +47,8 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 - With Silero VAD enabled, synthetic silence, two levels of random noise, and
   a synthetic tone returned no transcript. The bundled speech sample returned
   a nonempty transcript. These checks do not establish real-room accuracy.
+- The VAD model matched its pinned SHA-256. A VAD-enabled runtime started and
+  shut down cleanly with the installed assets.
 - The installed CLI returned an error for missing and corrupt VAD models.
   Startup and each recognition call also check the VAD model hash.
 - In a scratch Obsidian note, the user reported that the indicator appeared and
