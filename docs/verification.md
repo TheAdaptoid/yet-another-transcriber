@@ -73,6 +73,9 @@ Do not record audio, transcripts, window titles, or clipboard content in results
   a nonempty transcript. These checks do not establish real-room accuracy.
 - The VAD model matched its pinned SHA-256. A VAD-enabled runtime started and
   shut down cleanly with the installed assets.
+- For one bundled speech sample, the CLI peak working set was 304.1 MiB without
+  VAD and 310.5 MiB with VAD. These are single-run CLI measurements; they do
+  not include the Python host or establish a worst-case memory bound.
 - The installed CLI returned an error for missing and corrupt VAD models.
   Startup and each recognition call also check the VAD model hash.
 - In a scratch Obsidian note, the user reported that the indicator appeared and
