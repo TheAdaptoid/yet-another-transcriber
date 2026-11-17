@@ -39,9 +39,18 @@ The first real-PC silence test inserted `[BLANK_AUDIO]` into OpenCode.
 Synthetic no-speech noise also produced hallucinated words.
 The existing PCM peak gate and marker filter do not establish silence safety.
 
-- Add a small, CPU-only voice activity detection (VAD) model to the offline recognition path.
+- Use whisper.cpp v1.9.5's built-in CPU-only voice activity detection (VAD).
+  The user selected Silero over WebRTC VAD after comparing the options.
+  Silero uses the existing CLI and needs no Python inference framework.
+  Unlike a whole-recording WebRTC gate, it extracts speech segments and can
+  clip word boundaries.
 - Pin the VAD model and its integrity hash during setup.
   Keep the model under `~\.yat\models`; do not download it at runtime.
+- Use `ggml-silero-v5.1.2.bin` from
+  `https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin`.
+  Its SHA-256 is `29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf`.
+  Pass `--vad -vm <model-path>` to the pinned CLI on every recognition call.
+  Start with its v1.9.5 defaults; change them only after target-PC tests.
 - Require a positive speech detection before any transcript can be pasted.
   If detection finds no speech, return an empty result and do not paste.
 - If the VAD model is missing, invalid, or fails, show an error and do not paste.
@@ -54,8 +63,7 @@ The existing PCM peak gate and marker filter do not establish silence safety.
 - Test empty capture, quiet-room noise, and background noise without speech.
   Test normal and quiet speech, including short utterances.
   Report any false detection or rejected speech as a failed verification gate.
-- The VAD model and integration method remain to be selected from the lightweight options research.
-  Do not call the MVP usable until the selection, implementation, and real-PC checks are complete.
+- Do not call the MVP usable until implementation and real-PC checks are complete.
 
 ## Local diagnostics
 
