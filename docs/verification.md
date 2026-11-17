@@ -20,7 +20,9 @@ Do not record audio, transcripts, window titles, or clipboard content in results
   field produced the fallback without changing the search field.
 - [ ] **Not verified:** indicator never takes foreground while recording, processing, or showing a fallback in either target app.
 - [ ] **Not verified:** hotkey conflict, microphone failure, missing or invalid model, and clipboard or paste failures show an error or copyable transcript.
-- [ ] **Not verified:** a 60-second recording stops exactly once; shortcuts during transcription do nothing.
+- [ ] **Partially verified:** the user reported that a quiet recording stopped
+  automatically after about 60 seconds and left the input empty. Shortcuts
+  during transcription remain unverified on the target PC.
 - [ ] **Partially verified:** before VAD, a quiet recording inserted a
   `[BLANK_AUDIO]` marker and synthetic noise produced hallucinated words.
   With Silero VAD, the user repeated a quiet five-second recording in OpenCode
