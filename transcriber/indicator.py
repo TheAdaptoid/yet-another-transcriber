@@ -139,6 +139,9 @@ class _TkOverlay:
         self.text = None
         self.state = "idle"
         self.error_text = None
+        self._animation_job: str | None = None
+        self._animation_generation = 0
+        self._closed = False
 
     def _copy(self):
         if self.text:
@@ -155,6 +158,7 @@ class _TkOverlay:
         return user32.GetParent(self.root.winfo_id()) or self.root.winfo_id()
 
     def present(self, state, text):
+        self._stop_animation()
         self.state = state
         self.error_text = text if state == "error" else None
         self.text = text if state == "copy" else None
@@ -193,6 +197,62 @@ class _TkOverlay:
         else:
             self.dismiss_button.pack_forget()
         self._place()
+        if state in {"recording", "transcribing"}:
+            self._start_animation(state)
+
+    def _animations_enabled(self) -> bool:
+        enabled = wintypes.BOOL()
+        system_parameters = ctypes.windll.user32.SystemParametersInfoW
+        system_parameters.argtypes = [
+            wintypes.UINT,
+            wintypes.UINT,
+            ctypes.c_void_p,
+            wintypes.UINT,
+        ]
+        system_parameters.restype = wintypes.BOOL
+        return bool(
+            system_parameters(0x1042, 0, ctypes.byref(enabled), 0) and enabled.value
+        )
+
+    def _draw_activity(self, state: str, phase: int) -> None:
+        self.activity_label.delete("all")
+        if state == "recording":
+            x = 4 if phase == 0 else 9
+            self.activity_label.create_rectangle(x, 4, x + 7, 11, fill=_INK, outline="")
+        else:
+            for index, x in enumerate((3, 8, 13)):
+                top = 3 if index == phase else 6
+                self.activity_label.create_rectangle(
+                    x, top, x + 3, 11, fill=_INK, outline=""
+                )
+
+    def _start_animation(self, state: str) -> None:
+        self._draw_activity(state, 0)
+        if not self._animations_enabled():
+            return
+        generation = self._animation_generation
+        phase = 0
+
+        def tick():
+            nonlocal phase
+            if (
+                self._closed
+                or self.state != state
+                or self._animation_generation != generation
+            ):
+                return
+            self._animation_job = None
+            phase = (phase + 1) % (2 if state == "recording" else 3)
+            self._draw_activity(state, phase)
+            self._animation_job = self.root.after(1000, tick)
+
+        self._animation_job = self.root.after(1000, tick)
+
+    def _stop_animation(self) -> None:
+        self._animation_generation += 1
+        if self._animation_job is not None:
+            self.root.after_cancel(self._animation_job)
+            self._animation_job = None
 
     def _work_area(self) -> tuple[int, int, int, int]:
         rect = wintypes.RECT()
@@ -282,9 +342,13 @@ class _TkOverlay:
         )
 
     def hide(self):
+        self._stop_animation()
+        self.state = "idle"
         self.root.withdraw()
 
     def close(self):
+        self._stop_animation()
+        self._closed = True
         self.root.destroy()
 
 

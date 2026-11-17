@@ -128,3 +128,96 @@ def test_layout_respects_tk_scaling(overlay, monkeypatch, scaling):
         assert overlay.copy_button.winfo_manager()
     finally:
         overlay.root.tk.call("tk", "scaling", prior)
+
+
+def _clock(overlay, monkeypatch):
+    jobs = {}
+    cancelled = []
+
+    def after(delay, callback):
+        token = f"job-{len(jobs) + len(cancelled) + 1}"
+        jobs[token] = (delay, callback)
+        return token
+
+    def cancel(token):
+        cancelled.append(token)
+        jobs.pop(token, None)
+
+    monkeypatch.setattr(overlay.root, "after", after)
+    monkeypatch.setattr(overlay.root, "after_cancel", cancel)
+    return jobs, cancelled
+
+
+def _signal(overlay):
+    canvas = overlay.activity_label
+    return tuple(tuple(canvas.coords(item)) for item in canvas.find_all())
+
+
+def test_activity_moves_only_in_active_states_and_cancels_on_transition(
+    overlay, monkeypatch
+):
+    monkeypatch.setattr(overlay, "_animations_enabled", lambda: True, raising=False)
+    jobs, cancelled = _clock(overlay, monkeypatch)
+    overlay.present("recording", None)
+    record = _signal(overlay)
+    assert len(jobs) == 1
+    first, (delay, tick) = next(iter(jobs.items()))
+    assert 800 <= delay <= 1200
+    jobs.pop(first)
+    tick()
+    assert _signal(overlay) != record
+    successor = overlay._animation_job
+
+    overlay.present("transcribing", None)
+    assert successor in cancelled
+    assert _signal(overlay) != record
+    assert overlay._animation_job in jobs
+    overlay.present("error", "A microphone problem.")
+    assert overlay._animation_job is None
+    assert not overlay.activity_label.winfo_manager()
+    overlay.present("copy", "Example text")
+    assert overlay._animation_job is None
+
+
+def test_hide_and_close_cancel_pending_activity(overlay, monkeypatch):
+    monkeypatch.setattr(overlay, "_animations_enabled", lambda: True, raising=False)
+    jobs, cancelled = _clock(overlay, monkeypatch)
+    overlay.present("recording", None)
+    first = overlay._animation_job
+    stale = jobs[first][1]
+    overlay.hide()
+    assert first in cancelled
+    assert overlay._animation_job is None
+    stale()
+    overlay.present("transcribing", None)
+    second = overlay._animation_job
+    late = jobs[second][1]
+    overlay.close()
+    assert second in cancelled
+    late()
+
+
+@pytest.mark.parametrize("preference", ["disabled", "unavailable"])
+def test_disabled_or_unavailable_animation_is_static(overlay, monkeypatch, preference):
+    jobs, _ = _clock(overlay, monkeypatch)
+    if preference == "disabled":
+        monkeypatch.setattr(
+            overlay, "_animations_enabled", lambda: False, raising=False
+        )
+    else:
+        from transcriber import indicator
+
+        def unavailable(*args):
+            return 0
+
+        monkeypatch.setattr(
+            indicator.ctypes.windll.user32, "SystemParametersInfoW", unavailable
+        )
+    overlay.present("recording", None)
+    assert _signal(overlay)
+    assert overlay._animation_job is None
+    assert not jobs
+    overlay.present("transcribing", None)
+    assert _signal(overlay)
+    assert overlay._animation_job is None
+    assert not jobs
