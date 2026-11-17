@@ -15,7 +15,10 @@ Do not record audio, transcripts, window titles, or clipboard content in results
   for successful insertion in both applications during these checks.
 - [ ] **Partially verified:** the user reported that ordinary dictation remained
   editable without submission with Terminal multiline warnings both on and off.
-  A transcript containing line breaks has not been tested in the real prompt.
+  A separate guarded paste sanitized synthetic CR, LF, tab, and ANSI control
+  input; the user confirmed that its single-line result remained editable and
+  was not submitted. The warning setting during that synthetic check was not
+  recorded.
 - [x] **Verified:** switching from an Obsidian note to the search field
   produced the fallback without changing the search field.
 - [x] **Verified:** switching from OpenCode to an editable Obsidian search
