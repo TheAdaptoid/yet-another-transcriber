@@ -169,3 +169,127 @@ def test_recorder_does_not_open_stream_when_device_disappears(inventory):
     recorder.start()
     recorder.stop()
     assert calls[0]["device"] is None
+
+
+def test_running_recorder_refreshes_cached_portaudio_inventory(inventory, monkeypatch):
+    from transcriber.audio import Recorder
+
+    microphones, devices = inventory
+    microphones.select_device(2)
+    physical = list(devices)
+    snapshot = list(devices)
+    events = []
+
+    def initialize():
+        snapshot[:] = physical
+        events.append("initialize")
+
+    monkeypatch.setattr(
+        microphones.sd, "_terminate", lambda: events.append("terminate")
+    )
+    monkeypatch.setattr(microphones.sd, "_initialize", initialize)
+    monkeypatch.setattr(microphones.sd, "query_devices", lambda: snapshot)
+    opened = []
+
+    class Stream:
+        def __init__(self, **kwargs):
+            opened.append(kwargs["device"])
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+        def close(self):
+            pass
+
+    recorder = Recorder(stream_factory=Stream)
+    recorder.start()
+    recorder.stop()
+    physical.reverse()
+    recorder.start()
+    recorder.stop()
+    assert opened == [2, 0]
+    assert events == ["terminate", "initialize", "terminate", "initialize"]
+
+
+def test_second_recorder_cannot_refresh_while_stream_is_open(inventory, monkeypatch):
+    from transcriber.audio import Recorder
+
+    microphones, _ = inventory
+    calls = []
+    monkeypatch.setattr(microphones.sd, "_terminate", lambda: calls.append("terminate"))
+    monkeypatch.setattr(
+        microphones.sd, "_initialize", lambda: calls.append("initialize")
+    )
+
+    class Stream:
+        def __init__(self, **kwargs):
+            pass
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+        def close(self):
+            pass
+
+    first = Recorder(stream_factory=Stream)
+    second = Recorder(stream_factory=Stream)
+    first.start()
+    try:
+        with pytest.raises(microphones.MicrophoneError, match="in use"):
+            second.start()
+        assert calls == ["terminate", "initialize"]
+    finally:
+        first.stop()
+    second.start()
+    second.stop()
+    assert calls == ["terminate", "initialize", "terminate", "initialize"]
+
+
+def test_refresh_failure_retries_without_leaking_backend_lock(inventory, monkeypatch):
+    from transcriber.audio import Recorder
+
+    microphones, _ = inventory
+    monkeypatch.setattr(microphones.sd, "_initialized", 1)
+
+    def terminate():
+        microphones.sd._initialized = 0
+
+    attempts = []
+
+    def initialize():
+        attempts.append(True)
+        if len(attempts) == 1:
+            raise RuntimeError("backend unavailable")
+        microphones.sd._initialized = 1
+
+    monkeypatch.setattr(microphones.sd, "_terminate", terminate)
+    monkeypatch.setattr(microphones.sd, "_initialize", initialize)
+    opened = []
+
+    class Stream:
+        def __init__(self, **kwargs):
+            opened.append(kwargs["device"])
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+        def close(self):
+            pass
+
+    recorder = Recorder(stream_factory=Stream)
+    with pytest.raises(microphones.MicrophoneError):
+        recorder.start()
+    assert opened == []
+    recorder.start()
+    recorder.stop()
+    assert opened == [None]
+    assert len(attempts) == 2

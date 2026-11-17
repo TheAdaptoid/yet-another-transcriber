@@ -11,6 +11,8 @@ import sounddevice as sd
 from transcriber.config import MAX_SECONDS, SAMPLE_RATE
 from transcriber.microphones import CHANNELS, DTYPE, MicrophoneError, resolve_device
 
+_backend_lock = threading.Lock()
+
 
 class Recorder:
     """Capture samples in memory, rejecting stale stream callbacks."""
@@ -24,6 +26,7 @@ class Recorder:
         self._chunks = []
         self._count = 0
         self._stream = None
+        self._backend_owned = False
 
     def start(self):
         """Start one capture stream."""
@@ -48,6 +51,18 @@ class Recorder:
                     self._count += chunk.size
 
         try:
+            if not _backend_lock.acquire(blocking=False):
+                raise MicrophoneError(
+                    "Microphone backend is in use; stop recording first."
+                )
+            self._backend_owned = True
+            if sd._initialized > 1:
+                raise MicrophoneError(
+                    "Microphone backend is in use; restart YAT and try again."
+                )
+            if sd._initialized:
+                sd._terminate()
+            sd._initialize()
             device = resolve_device()
             self._stream = self._stream_factory(
                 device=device,
@@ -74,11 +89,16 @@ class Recorder:
             chunks = self._chunks
             self._chunks = []
             stream, self._stream = self._stream, None
-        if stream is not None:
-            try:
-                stream.stop()
-            finally:
-                stream.close()
+        try:
+            if stream is not None:
+                try:
+                    stream.stop()
+                finally:
+                    stream.close()
+        finally:
+            if self._backend_owned:
+                self._backend_owned = False
+                _backend_lock.release()
         return np.concatenate(chunks).copy() if chunks else np.empty(0, dtype=np.int16)
 
     def close(self):
