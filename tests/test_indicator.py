@@ -19,19 +19,26 @@ def overlay(tk_master):
 
 def test_states_have_distinct_ribbons_and_real_text(overlay):
     overlay.present("recording", None)
+    overlay.root.update()
+    assert overlay.root.winfo_width() >= 230
+    assert overlay.frame.winfo_width() >= overlay.root.winfo_width() - 7
     assert overlay.state_label.cget("text") == "RECORDING"
     assert overlay.ribbon.cget("bg") == "#F36746"
     assert overlay.label.cget("text") == "Recording…"
     assert overlay.hint_label.cget("text") == "Win+Alt+S to stop"
+    assert overlay.hint_label.winfo_manager()
     assert overlay.close_button.winfo_manager()
     assert not overlay.copy_button.winfo_manager()
     assert not overlay.dismiss_button.winfo_manager()
 
     overlay.present("transcribing", None)
+    overlay.root.update_idletasks()
+    assert overlay.root.winfo_width() >= 230
     assert overlay.state_label.cget("text") == "TRANSCRIBING"
     assert overlay.ribbon.cget("bg") == "#A6D4EF"
     assert overlay.label.cget("text") == "Transcribing…"
     assert overlay.hint_label.cget("text") == ""
+    assert not overlay.hint_label.winfo_manager()
     assert overlay.close_button.winfo_manager()
 
 
@@ -70,6 +77,9 @@ def test_copy_result_is_complete_selectable_and_reports_clipboard_outcomes(
     assert overlay.ribbon.cget("bg") == "#F5CB5E"
     assert overlay.label.cget("text") == "Could not paste. Select or copy this result."
     assert overlay.transcript.get("1.0", "end-1c") == result
+    panels = overlay.separator.master.pack_slaves()
+    assert panels.index(overlay.transcript_holder) < panels.index(overlay.separator)
+    assert panels.index(overlay.separator) < panels.index(overlay.close_button.master)
     overlay.transcript.tag_add("sel", "1.0", "1.8")
     assert overlay.transcript.get("sel.first", "sel.last") == "Example "
     assert all(
@@ -116,7 +126,7 @@ def test_long_error_and_result_stay_within_work_area(overlay, monkeypatch):
     assert overlay.copy_button.winfo_manager()
 
 
-@pytest.mark.parametrize("scaling", [1.0, 1.5])
+@pytest.mark.parametrize("scaling", [1.0, 1.25, 1.5])
 def test_layout_respects_tk_scaling(overlay, monkeypatch, scaling):
     area = (0, 0, 520, 350)
     monkeypatch.setattr(overlay, "_work_area", lambda: area, raising=False)

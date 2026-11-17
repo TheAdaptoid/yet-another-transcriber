@@ -26,7 +26,7 @@ class _TkOverlay:
         self.root.attributes("-topmost", True)
         self.root.configure(bg=_INK)
         self.frame = tk.Frame(root, bg=_INK, padx=2, pady=2)
-        self.frame.pack(padx=(0, 7), pady=(0, 7))
+        self.frame.pack(fill="both", expand=True, padx=(0, 7), pady=(0, 7))
         paper = tk.Frame(self.frame, bg=_PAPER)
         paper.pack(fill="both", expand=True)
         self.ribbon = tk.Frame(paper, bg=_STATE_COLORS["recording"], padx=11, pady=5)
@@ -177,6 +177,10 @@ class _TkOverlay:
             }.get(state, state)
         )
         self.hint_label.config(text="Win+Alt+S to stop" if state == "recording" else "")
+        if state == "recording":
+            self.hint_label.pack(fill="x", pady=(4, 0))
+        else:
+            self.hint_label.pack_forget()
         if state in {"recording", "transcribing"}:
             self.activity_label.pack(side="right")
         else:
@@ -186,7 +190,13 @@ class _TkOverlay:
             self.transcript.delete("1.0", "end")
             self.transcript.insert("1.0", text or "")
             self.transcript.config(state="disabled")
-            self.transcript_holder.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+            self.transcript_holder.pack(
+                before=self.separator,
+                fill="both",
+                expand=True,
+                padx=12,
+                pady=(0, 8),
+            )
             self.copy_button.pack(side="right")
         else:
             self.transcript_holder.pack_forget()
@@ -312,7 +322,7 @@ class _TkOverlay:
             self.transcript.config(height=lines)
 
         self.root.update_idletasks()
-        width = min(max_width, self.root.winfo_reqwidth())
+        width = min(max_width, max(round(260 * scale), self.root.winfo_reqwidth()))
         height = min(max_height, self.root.winfo_reqheight())
         x = max(left, right - width - margin)
         y = max(top, bottom - height - margin)
