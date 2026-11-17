@@ -13,6 +13,212 @@ from transcriber.diagnostics import make_logger
 from transcriber.recognizer import RecognitionError, Recognizer
 
 
+def test_canceled_before_worker_does_not_launch_and_recognizer_is_reusable(tmp_path):
+    from transcriber.recognizer import Cancellation
+
+    paths = Paths.for_home(tmp_path)
+    paths.cli.parent.mkdir(parents=True)
+    paths.cli.touch()
+    calls = []
+
+    class Process:
+        returncode = 0
+
+        def communicate(self, timeout=None):
+            return ("next result", "")
+
+    recognizer = Recognizer(
+        make_logger(paths.log), popen=lambda *a, **k: calls.append(1) or Process()
+    )
+    canceled = Cancellation()
+    canceled.cancel()
+    with pytest.raises(RecognitionError):
+        recognizer.transcribe(np.array([1000], dtype=np.int16), paths, "old", canceled)
+    assert not calls
+    assert (
+        recognizer.transcribe(np.array([1000], dtype=np.int16), paths, "new")
+        == "next result"
+    )
+    assert not list(paths.tmp.glob("yat-*.wav"))
+
+
+def test_cancel_active_job_does_not_kill_next_job_and_cleans_wavs(tmp_path):
+    from transcriber.recognizer import Cancellation
+
+    paths = Paths.for_home(tmp_path)
+    paths.cli.parent.mkdir(parents=True)
+    paths.cli.touch()
+    entered = threading.Event()
+    released = threading.Event()
+    processes = []
+
+    class Process:
+        returncode = 0
+
+        def __init__(self):
+            self.killed = False
+
+        def communicate(self, timeout=None):
+            if len(processes) == 1:
+                entered.set()
+                assert released.wait(5)
+            return ("result", "")
+
+        def kill(self):
+            self.killed = True
+            released.set()
+
+    def launch(*args, **kwargs):
+        process = Process()
+        processes.append(process)
+        return process
+
+    recognizer = Recognizer(make_logger(paths.log), popen=launch)
+    token = Cancellation()
+    errors = []
+
+    def run_old():
+        try:
+            recognizer.transcribe(np.array([1000], dtype=np.int16), paths, "old", token)
+        except RecognitionError as exc:
+            errors.append(exc)
+
+    thread = threading.Thread(target=run_old)
+    thread.start()
+    assert entered.wait(5)
+    token.cancel()
+    thread.join(5)
+    assert not thread.is_alive()
+    assert processes[0].killed
+    assert (
+        recognizer.transcribe(np.array([1000], dtype=np.int16), paths, "new")
+        == "result"
+    )
+    token.cancel()
+    assert not processes[1].killed
+    assert not list(paths.tmp.glob("yat-*.wav"))
+
+
+def test_old_cancellation_does_not_kill_overlapping_next_job(tmp_path):
+    from transcriber.recognizer import Cancellation
+
+    paths = Paths.for_home(tmp_path)
+    paths.cli.parent.mkdir(parents=True)
+    paths.cli.touch()
+    entered = [threading.Event(), threading.Event()]
+    release = [threading.Event(), threading.Event()]
+    processes = []
+
+    class Process:
+        returncode = 0
+
+        def __init__(self, index):
+            self.index = index
+            self.killed = False
+
+        def communicate(self, timeout=None):
+            entered[self.index].set()
+            assert release[self.index].wait(5)
+            return "result", ""
+
+        def kill(self):
+            self.killed = True
+            release[self.index].set()
+
+    def launch(*args, **kwargs):
+        process = Process(len(processes))
+        processes.append(process)
+        return process
+
+    recognizer = Recognizer(make_logger(paths.log), popen=launch)
+    tokens = [Cancellation(), Cancellation()]
+    results = []
+
+    def run(index):
+        results.append(
+            recognizer.transcribe(
+                np.array([1000], dtype=np.int16), paths, str(index), tokens[index]
+            )
+        )
+
+    first = threading.Thread(target=run, args=(0,))
+    second = threading.Thread(target=run, args=(1,))
+    first.start()
+    assert entered[0].wait(5)
+    second.start()
+    assert entered[1].wait(5)
+    tokens[0].cancel()
+    first.join(5)
+    assert not first.is_alive()
+    assert processes[0].killed and not processes[1].killed
+    release[1].set()
+    second.join(5)
+    assert not second.is_alive()
+    assert not list(paths.tmp.glob("yat-*.wav"))
+
+
+@pytest.mark.parametrize("phase", ["wav", "launch"])
+def test_cancel_during_preparation_or_launch_cleans_owned_wav(
+    tmp_path, monkeypatch, phase
+):
+    from transcriber import recognizer as module
+    from transcriber.recognizer import Cancellation
+
+    paths = Paths.for_home(tmp_path)
+    paths.cli.parent.mkdir(parents=True)
+    paths.cli.touch()
+    entered = threading.Event()
+    release = threading.Event()
+    killed = threading.Event()
+    real_write = module.write_temp_wav
+    launches = []
+
+    def write(samples, directory):
+        wav = real_write(samples, directory)
+        if phase == "wav":
+            entered.set()
+            assert release.wait(5)
+        return wav
+
+    class Process:
+        returncode = 1
+
+        def kill(self):
+            killed.set()
+
+        def communicate(self, timeout=None):
+            return "", ""
+
+    def launch(*args, **kwargs):
+        launches.append(True)
+        entered.set()
+        assert release.wait(5)
+        return Process()
+
+    monkeypatch.setattr(module, "write_temp_wav", write)
+    recognizer = Recognizer(make_logger(paths.log), popen=launch)
+    token = Cancellation()
+    errors = []
+
+    def run():
+        try:
+            recognizer.transcribe(np.array([1000], dtype=np.int16), paths, "old", token)
+        except RecognitionError as exc:
+            errors.append(exc.category)
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    assert entered.wait(5)
+    token.cancel()
+    release.set()
+    thread.join(5)
+    assert not thread.is_alive()
+    assert errors
+    assert bool(launches) == (phase == "launch")
+    assert killed.is_set() == (phase == "launch")
+    assert not list(paths.tmp.glob("yat-*.wav"))
+
+
 @pytest.fixture(autouse=True)
 def vad_model(tmp_path, monkeypatch):
     from transcriber import recognizer as module

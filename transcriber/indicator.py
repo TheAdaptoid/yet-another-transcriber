@@ -18,9 +18,10 @@ _STATE_COLORS = {
 
 
 class _TkOverlay:
-    def __init__(self, root, on_close):
+    def __init__(self, root, on_close, on_cancel=lambda: None):
         self.root = root
         self.on_close = on_close
+        self.on_cancel = on_cancel
         self.root.withdraw()
         self.root.overrideredirect(True)
         self.root.attributes("-topmost", True)
@@ -135,6 +136,9 @@ class _TkOverlay:
         self.close_button = tk.Button(
             actions, button_style, text="Exit", command=on_close
         )
+        self.cancel_button = tk.Button(
+            actions, button_style, text="Cancel", command=lambda: self.on_cancel()
+        )
         self.close_button.pack(side="right")
         self.text = None
         self.state = "idle"
@@ -184,8 +188,10 @@ class _TkOverlay:
             self.hint_label.pack_forget()
         if state in {"recording", "transcribing"}:
             self.activity_label.pack(side="right")
+            self.cancel_button.pack(side="right")
         else:
             self.activity_label.pack_forget()
+            self.cancel_button.pack_forget()
         if state == "copy":
             self.transcript.config(state="normal")
             self.transcript.delete("1.0", "end")
@@ -375,9 +381,11 @@ class _TkOverlay:
 class Indicator:
     """Present states via a non-activating adapter."""
 
-    def __init__(self, root=None, on_close=lambda: None, adapter=None):
+    def __init__(
+        self, root=None, on_close=lambda: None, adapter=None, on_cancel=lambda: None
+    ):
         """Use the supplied adapter or construct the Tk overlay."""
-        self.adapter = adapter or _TkOverlay(root, on_close)
+        self.adapter = adapter or _TkOverlay(root, on_close, on_cancel)
 
     def show(self, state: str, text: str | None = None):
         """Show a status or hide the idle indicator."""

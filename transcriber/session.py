@@ -7,6 +7,7 @@ import uuid
 from transcriber.config import MAX_SECONDS, MODEL_NAME, SAMPLE_RATE
 from transcriber.diagnostics import log_event
 from transcriber.insertion import WindowsInsertion, paste_text, safe_text
+from transcriber.recognizer import Cancellation
 from transcriber.targets import capture_target, still_focused
 
 
@@ -53,6 +54,7 @@ class SessionController:
         self.stop_time = 0.0
         self._hotkey_lock = threading.Lock()
         self._hotkey_epoch = 0
+        self._cancellation = None
 
     def enqueue_hotkey(self, post):
         """Discard presses received while busy, including delayed queue entries."""
@@ -132,10 +134,14 @@ class SessionController:
             self.show_state("transcribing", None)
             session_id = self.session_id
             generation = self.generation
+            cancellation = Cancellation()
+            self._cancellation = cancellation
 
             def job():
                 try:
-                    text = self.recognizer.transcribe(samples, self.paths, session_id)
+                    text = self.recognizer.transcribe(
+                        samples, self.paths, session_id, cancellation
+                    )
                     error = None
                 except Exception as exc:
                     text = None
@@ -160,6 +166,30 @@ class SessionController:
     def _complete_for(self, generation, text, error):
         if not self.closed and generation == self.generation:
             self.on_transcription_done(text, error)
+
+    def cancel(self):
+        """Discard the active utterance on the UI thread."""
+        if self.closed or self.state not in {"recording", "transcribing"}:
+            return
+        previous = self.state
+        with self._hotkey_lock:
+            self.generation += 1
+            self._hotkey_epoch += 1
+            self.state = "idle"
+        if previous == "transcribing":
+            if self._cancellation is not None:
+                self._cancellation.cancel()
+                self._cancellation = None
+        else:
+            try:
+                self.recorder.close()
+            except Exception:
+                log_event(
+                    self.logger, self.session_id, "error", error_category="microphone"
+                )
+                self.show_state("error", "Recording could not be closed.")
+                return
+        self.show_state("idle", None)
 
     def on_transcription_done(self, text: str | None, error: str | None):
         """Handle recognition completion on the UI thread."""
