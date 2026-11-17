@@ -186,3 +186,50 @@ raise SystemExit(service._child_main())
         assert "not running" in message.lower()
     finally:
         service.stop_service()
+
+
+def test_detached_child_survives_launcher_exit(monkeypatch):
+    import subprocess
+    import sys
+
+    name = f"Local\\yat-orphan-test-{uuid.uuid4().hex}"
+    child_code = f"""
+import time
+from transcriber import service
+import transcriber.__main__ as runtime
+service._instance_name = lambda: {name!r}
+def fake_main(signals, report):
+    report("ready")
+    while not signals.stop_requested():
+        time.sleep(0.01)
+    return 0
+runtime.main = fake_main
+raise SystemExit(service._child_main())
+"""
+    parent_code = f"""
+import subprocess
+import sys
+from transcriber import service
+original = subprocess.Popen
+def launch(args, **kwargs):
+    return original([sys.executable, "-c", {child_code!r}], **kwargs)
+service.subprocess.Popen = launch
+ok, message = service.start_service()
+print(message)
+raise SystemExit(0 if ok else 1)
+"""
+    monkeypatch.setattr(service, "_instance_name", lambda: name)
+    try:
+        parent = subprocess.run(
+            [sys.executable, "-c", parent_code],
+            capture_output=True,
+            text=True,
+            timeout=25,
+            check=False,
+        )
+        assert parent.returncode == 0, parent.stdout + parent.stderr
+        ok, message = service.stop_service()
+        assert ok
+        assert "stopped" in message.lower()
+    finally:
+        service.stop_service()
