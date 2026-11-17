@@ -38,7 +38,9 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 - [ ] **Partially verified:** the user reported that soft instrumental music
   without speech did not insert text. Speech-like noise and other music levels
   remain unverified.
-- [ ] **Not verified:** disconnect networking after setup, restart, and dictate successfully.
+- [ ] **Not verified:** disconnect networking after setup, restart, and dictate
+  successfully. The user chose to defer this test; source inspection found
+  network access in setup scripts, not in the application runtime code.
 - [ ] **Not verified:** orphan audio is removed and log rotation preserves privacy.
 
 ## Observations in this development environment
@@ -77,8 +79,8 @@ Do not record audio, transcripts, window titles, or clipboard content in results
   field, the user reported that the fallback appeared and the search field
   remained unchanged.
 - Windows Terminal, Obsidian, OpenCode, and a default input device are present.
-  OpenCode insertion, offline operation, and the remaining microphone and
-  failure checks still require a controlled manual session.
+  Offline operation and the remaining microphone and failure checks still
+  require a controlled manual session.
 
 ## Latency observations
 
