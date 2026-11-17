@@ -73,8 +73,8 @@ yat start
 `yat start` runs the app in the background, so you can close the terminal.
 
 > **CAUTION:** The app replaces the Windows clipboard and does not restore its
-> previous contents. Before you paste a fallback into a terminal, check that
-> the text is on one line.
+> previous contents. Fallback text is sanitized to one line, but you should
+> still review it before pasting into a terminal.
 
 1. Click an input in the target application.
 2. Press **Win+Alt+S**.
@@ -118,15 +118,16 @@ Uninstalling the tool does not remove the separate assets and logs under
 - The app stores local diagnostic logs under `%USERPROFILE%\.yat\logs`. The logs
   have stage timings and error categories. They do not have audio or transcript text.
 - The app replaces the Windows clipboard with the result and does not restore
-  its previous contents. If you manually paste a fallback into a terminal,
-  check that it is a single line first.
+  its previous contents. Review fallback text before manually pasting it into
+  a terminal.
 - The app requires the same foreground window and UI Automation element before
   paste. It rejects elements reported as disabled or password fields. Applications
   differ in their UI Automation and Ctrl+V support; compatibility is not guaranteed.
   A focus check and Ctrl+V cannot be atomic. Sending Ctrl+V does not prove that
   the target accepted the text. Check the result before you submit it.
-- Automatic paste removes line breaks and control characters in every target.
-  The app shows a copyable result if it cannot confirm a target or send the paste.
+- Clipboard-bound transcripts and displayed fallback results are sanitized to a
+  single line without terminal control sequences. The app shows a copyable
+  result if it cannot confirm a target or send the paste.
 
 ## Contributing and license
 
