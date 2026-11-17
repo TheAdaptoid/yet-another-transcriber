@@ -7,11 +7,6 @@ app = typer.Typer(no_args_is_help=True)
 console = Console()
 
 
-def _not_implemented() -> None:
-    console.print("This command is not implemented yet.")
-    raise typer.Exit(code=1)
-
-
 @app.command()
 def start() -> None:
     """Start dictation in the background."""
@@ -37,4 +32,11 @@ def stop() -> None:
 @app.command()
 def doctor() -> None:
     """Check the local installation."""
-    _not_implemented()
+    from transcriber.doctor import run_checks
+
+    checks = run_checks()
+    for name, status, detail in checks:
+        label = "OK" if status is True else "UNKNOWN" if status is None else "FAIL"
+        console.print(f"{name}: {label} — {detail}")
+    if any(status is False for _, status, _ in checks):
+        raise typer.Exit(code=1)
