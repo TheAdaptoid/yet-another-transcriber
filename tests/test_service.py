@@ -76,3 +76,74 @@ def test_launcher_timeout_terminates_only_its_child(monkeypatch):
     assert not ok
     assert "timed out" in message.lower()
     assert child.killed
+
+
+def test_stop_without_service_is_success(monkeypatch):
+    monkeypatch.setattr(
+        service, "_instance_name", lambda: f"Local\\yat-{uuid.uuid4().hex}"
+    )
+    ok, message = service.stop_service()
+    assert ok
+    assert "not running" in message.lower()
+
+
+def test_stop_signals_instance_and_waits_for_release(monkeypatch):
+    import threading
+
+    name = f"Local\\yat-test-{uuid.uuid4().hex}"
+    ready = threading.Event()
+    observed = []
+
+    def owner_thread():
+        owner = InstanceSignals.acquire(name)
+        assert owner is not None
+        ready.set()
+        while not owner.stop_requested():
+            threading.Event().wait(0.01)
+        observed.append(True)
+        owner.close()
+
+    thread = threading.Thread(target=owner_thread)
+    thread.start()
+    assert ready.wait(2)
+    monkeypatch.setattr(service, "_instance_name", lambda: name)
+    try:
+        ok, message = service.stop_service()
+        assert ok, message
+        assert observed == [True]
+    finally:
+        InstanceSignals.request_stop(name)
+        thread.join(timeout=2)
+    assert not thread.is_alive()
+
+
+def test_stop_timeout_never_terminates_process(monkeypatch):
+    class Kernel:
+        def OpenMutexW(self, *args):
+            return 1
+
+        def WaitForSingleObject(self, *args):
+            return 258
+
+        def CloseHandle(self, *args):
+            return 1
+
+    monkeypatch.setattr(service, "_instance_name", lambda: "test")
+    monkeypatch.setattr(service, "_kernel", Kernel())
+    monkeypatch.setattr(InstanceSignals, "request_stop", lambda name: True)
+    ok, message = service.stop_service()
+    assert not ok
+    assert "timed out" in message.lower()
+
+
+def test_launcher_reports_duplicate_instance(monkeypatch):
+    class Child:
+        stdout = io.BytesIO(b"error:already_running\n")
+
+        def wait(self, timeout=None):
+            return 1
+
+    monkeypatch.setattr(service.subprocess, "Popen", lambda *a, **k: Child())
+    ok, message = service.start_service()
+    assert not ok
+    assert "already running" in message.lower()

@@ -10,6 +10,8 @@ from ctypes import wintypes
 _kernel = ctypes.WinDLL("kernel32", use_last_error=True)
 _kernel.CreateMutexW.argtypes = (wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR)
 _kernel.CreateMutexW.restype = wintypes.HANDLE
+_kernel.OpenMutexW.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR)
+_kernel.OpenMutexW.restype = wintypes.HANDLE
 _kernel.CreateEventW.argtypes = (
     wintypes.LPVOID,
     wintypes.BOOL,
@@ -183,6 +185,34 @@ def start_service() -> tuple[bool, str]:
     if result == "error:assets_or_hotkey":
         return False, "Startup failed: check local assets and the hotkey."
     return False, "Background process failed before reporting readiness."
+
+
+def stop_service() -> tuple[bool, str]:
+    """Request shutdown and wait for the instance to release its mutex."""
+    try:
+        name = _instance_name()
+        mutex = _kernel.OpenMutexW(0x00100001, False, name + "-mutex")
+        if not mutex:
+            if ctypes.get_last_error() == 2:
+                return True, "Dictation is not running."
+            return False, "Could not access the dictation instance."
+        try:
+            if not InstanceSignals.request_stop(name):
+                return (
+                    False,
+                    "Instance is starting or its shutdown signal is unavailable.",
+                )
+            result = _kernel.WaitForSingleObject(mutex, 10000)
+            if result in (0, 0x80):
+                _kernel.ReleaseMutex(mutex)
+                return True, "Dictation stopped."
+            if result == 258:
+                return False, "Timed out waiting for dictation to stop."
+            return False, "Could not confirm dictation stopped."
+        finally:
+            _kernel.CloseHandle(mutex)
+    except OSError:
+        return False, "Could not signal the dictation instance."
 
 
 def _child_main() -> int:

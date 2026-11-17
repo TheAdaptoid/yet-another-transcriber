@@ -15,13 +15,23 @@ def _not_implemented() -> None:
 @app.command()
 def start() -> None:
     """Start dictation in the background."""
-    _not_implemented()
+    from transcriber.service import start_service
+
+    ok, message = start_service()
+    console.print(message)
+    if not ok:
+        raise typer.Exit(code=1)
 
 
 @app.command()
 def stop() -> None:
     """Stop the background dictation process."""
-    _not_implemented()
+    from transcriber.service import stop_service
+
+    ok, message = stop_service()
+    console.print(message)
+    if not ok:
+        raise typer.Exit(code=1)
 
 
 @app.command()
