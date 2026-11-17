@@ -31,7 +31,7 @@ class Recognizer:
         self.error = None
         self.closed = False
 
-    def transcribe(self, samples, paths, session_id):
+    def transcribe(self, samples, paths, session_id, cancellation=None):
         if self.error:
             raise RuntimeError("private words")
         return self.text
@@ -75,6 +75,55 @@ def setup_controller(tmp_path):
 def finish_work(work, ui):
     work.pop(0)()
     ui.pop(0)()
+
+
+def test_cancel_recording_discards_audio_and_invalidates_queued_callbacks(tmp_path):
+    ctl, rec, _, states, timers, work, ui, pastes, copies, _ = setup_controller(
+        tmp_path
+    )
+    ctl.on_hotkey()
+    ctl.enqueue_hotkey(ui.append)
+    ctl.cancel()
+    ctl.cancel()
+    timers[0][1]()
+    ui.pop(0)()
+    assert ctl.state == "idle"
+    assert states[-1] == ("idle", None)
+    assert rec.stops == 0
+    assert not work and not pastes and not copies
+    ctl.on_hotkey()
+    assert ctl.state == "recording"
+
+
+def test_cancel_close_failure_never_starts_recognition(tmp_path):
+    ctl, rec, _, states, _, work, _, _, _, _ = setup_controller(tmp_path)
+    ctl.on_hotkey()
+
+    def fail_close():
+        raise OSError("private audio")
+
+    rec.close = fail_close
+    ctl.cancel()
+    assert ctl.state == "idle"
+    assert states[-1] == ("error", "Recording could not be closed.")
+    assert not work
+
+
+@pytest.mark.parametrize("error", [False, True])
+def test_canceled_completion_cannot_affect_next_recording(tmp_path, error):
+    ctl, _, recognizer, states, _, work, ui, pastes, copies, _ = setup_controller(
+        tmp_path
+    )
+    ctl.on_hotkey()
+    ctl.on_hotkey()
+    recognizer.error = error
+    work.pop(0)()
+    ctl.cancel()
+    ctl.on_hotkey()
+    ui.pop(0)()
+    assert ctl.state == "recording"
+    assert states[-1] == ("recording", None)
+    assert not pastes and not copies
 
 
 def test_session_transitions_timings_busy_and_one_id(tmp_path):

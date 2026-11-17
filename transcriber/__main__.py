@@ -166,7 +166,11 @@ def main(signals=None, report=None) -> int:
         if app is not None:
             app.shutdown()
 
-    indicator = Indicator(root=root, on_close=shutdown)
+    def cancel():
+        if app is not None and app.controller is not None:
+            app.controller.cancel()
+
+    indicator = Indicator(root=root, on_close=shutdown, on_cancel=cancel)
     app = Runtime(
         paths=paths, indicator=indicator, listener=HotkeyListener(), loop=root
     )

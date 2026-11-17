@@ -20,15 +20,16 @@ truncated.
 
 | State | Ribbon | Main message | Additional content | Actions |
 | --- | --- | --- | --- | --- |
-| Recording | Coral `RECORDING`, moving single mark | `Recording…` | `Win+Alt+S to stop` hint | Exit |
-| Transcribing | Blue `TRANSCRIBING`, stepped three-bar mark | `Transcribing…` | None | Exit |
+| Recording | Coral `RECORDING`, moving single mark | `Recording…` | `Win+Alt+S to stop` hint | Cancel, Exit |
+| Transcribing | Blue `TRANSCRIBING`, stepped three-bar mark | `Transcribing…` | None | Cancel, Exit |
 | Error | Yellow `ERROR`, static | Actual error or `Dictation failed.` | Very long error moves to a scrollable detail area, with the complete text | Dismiss, Exit |
 | Copy result | Yellow `RESULT`, static | `Could not paste. Select or copy this result.` | Entire selectable, scrollable transcript | Copy, Dismiss, Exit |
 
 When Copy succeeds, the status reads `Copied. You can dismiss this result.`;
 when it fails, it reads `Copy failed. Select the text and try again.` The
-transcript stays intact in both cases. Dismiss hides the overlay without
-quitting; Exit closes the application via its existing callback.
+transcript stays intact in both cases. Cancel discards the active utterance
+without quitting; Dismiss hides the overlay without quitting; Exit closes the
+application via its existing callback.
 These actions are pointer-only: the non-activating overlay does not accept
 keyboard focus, so Tab cannot reach the buttons.
 

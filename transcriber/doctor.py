@@ -6,12 +6,11 @@ import platform
 import sys
 from pathlib import Path
 
-import sounddevice as sd
-
 from transcriber import service
 from transcriber.__main__ import check_assets
 from transcriber.config import Paths
 from transcriber.hotkey import HotkeyListener
+from transcriber.microphones import MicrophoneError, check_format, resolve_device
 
 
 def check_shortcut() -> tuple[bool | None, str]:
@@ -57,17 +56,17 @@ def run_checks() -> list[tuple[str, bool | None, str]]:
         ("assets", assets_ok, "Assets valid." if assets_ok else "Run the asset setup.")
     )
     try:
-        device = sd.query_devices(kind="input")
-        microphone_ok = device["max_input_channels"] > 0
-    except Exception:
+        check_format(resolve_device())
+        microphone_ok = True
+        detail = "Input format supported."
+    except MicrophoneError as exc:
         microphone_ok = False
+        detail = str(exc)
     checks.append(
         (
             "microphone",
             microphone_ok,
-            "Input device available."
-            if microphone_ok
-            else "Check the default microphone.",
+            detail,
         )
     )
     status, detail = check_shortcut()

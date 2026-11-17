@@ -90,6 +90,40 @@ class Overlay:
         self.events.append(("close",))
 
 
+def test_main_wires_cancel_to_controller(monkeypatch, tmp_path):
+    calls = []
+    callbacks = {}
+
+    class Root:
+        def mainloop(self):
+            callbacks["cancel"]()
+
+    class Controller:
+        def cancel(self):
+            calls.append("cancel")
+
+    class App:
+        def __init__(self, **kwargs):
+            self.controller = Controller()
+
+        def start(self):
+            pass
+
+        def shutdown(self):
+            pass
+
+    def indicator(**kwargs):
+        callbacks["cancel"] = kwargs["on_cancel"]
+        return object()
+
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setattr(runtime.tk, "Tk", Root)
+    monkeypatch.setattr(runtime, "Indicator", indicator)
+    monkeypatch.setattr(runtime, "Runtime", App)
+    assert runtime.main() == 0
+    assert calls == ["cancel"]
+
+
 def test_indicator_only_uses_nonactivating_overlay():
     overlay = Overlay()
     indicator = Indicator(adapter=overlay)

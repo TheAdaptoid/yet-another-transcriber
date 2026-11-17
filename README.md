@@ -72,6 +72,29 @@ yat start
 
 `yat start` runs the app in the background, so you can close the terminal.
 
+### Choose a microphone
+
+By default, YAT uses the current Windows default input. To choose another:
+
+```powershell
+yat microphone list
+yat microphone select 2  # Replace 2 with an input index from the list.
+yat doctor
+```
+
+Run `yat microphone clear` to use the default again. Selection changes take
+effect at the next recording, even if YAT is already running. The selection
+stores the device name and host API in `%USERPROFILE%\.yat\microphone.json`,
+not its temporary index. If the device is disconnected, renamed, or has the
+same name and host API as another input, YAT refuses to choose a replacement.
+Reconnect it or list and select a unique device again. Identically named
+replacement hardware may be indistinguishable; device changes between lookup
+and stream opening are also possible.
+
+`yat doctor` checks whether the chosen input supports 16 kHz mono int16
+without recording. A successful check does not guarantee a later stream will
+open, since devices can change or become busy.
+
 > **CAUTION:** The app replaces the Windows clipboard and does not restore its
 > previous contents. Fallback text is sanitized to one line, but you should
 > still review it before pasting into a terminal.
