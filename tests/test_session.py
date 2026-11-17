@@ -1,6 +1,7 @@
 import json
 
 import numpy as np
+import pytest
 
 from transcriber.config import Paths
 from transcriber.diagnostics import make_logger
@@ -146,6 +147,28 @@ def test_session_sanitizes_multiline_text_before_automatic_paste(tmp_path):
     ctl.on_hotkey()
     finish_work(work, ui)
     assert pastes == ["first second"]
+
+
+@pytest.mark.parametrize("failure", ["missing_target", "changed_focus", "failed_paste"])
+def test_fallback_copy_and_display_use_sanitized_text(tmp_path, failure):
+    ctl, _, recognizer, states, _, work, ui, pastes, copies, _ = setup_controller(
+        tmp_path
+    )
+    recognizer.text = "first\r\n\x1b[31msecond\x1b[0m\x07third"
+    if failure == "missing_target":
+        ctl.capture = lambda: None
+    elif failure == "changed_focus":
+        ctl.focused = lambda target: False
+    else:
+        ctl.paste = lambda text, **kwargs: pastes.append(text) or False
+
+    ctl.on_hotkey()
+    ctl.on_hotkey()
+    finish_work(work, ui)
+
+    assert pastes == (["first second third"] if failure == "failed_paste" else [])
+    assert copies == ["first second third"]
+    assert states[-1] == ("copy", "first second third")
 
 
 def test_silence_and_error_never_paste(tmp_path):

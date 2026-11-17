@@ -189,7 +189,7 @@ class SessionController:
         except Exception:
             valid = False
         self._event("focus_check", started)
-        output = safe_text(text) if target is not None else text
+        output = safe_text(text)
         success = False
         if valid and target is not None and output:
             started = self.clock()
