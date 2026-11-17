@@ -92,3 +92,7 @@ Record cold and warm results separately, without transcript content. Use
 | 5 seconds | Not verified | Not verified | Not verified |
 | 15 seconds | Not verified | Not verified | Not verified |
 | 45 seconds | Not verified | Not verified | Not verified |
+
+One user-requested short dictation captured 12.35 seconds of audio.
+The log reports 1.11 seconds of inference and 1.48 seconds from stop to
+insertion. Its cold/warm status was not recorded.
