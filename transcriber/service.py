@@ -163,7 +163,7 @@ def start_service() -> tuple[bool, str]:
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             creationflags=(
-                subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+                subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
             ),
         )
     except OSError:

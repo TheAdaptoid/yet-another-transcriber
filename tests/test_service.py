@@ -32,6 +32,36 @@ def test_instance_name_uses_current_windows_sid():
     assert service._instance_name() == service._instance_name()
 
 
+def test_launcher_uses_no_window_and_redirected_handles(monkeypatch):
+    import subprocess
+    import sys
+
+    class Child:
+        stdout = io.BytesIO(b"ready\n")
+
+    launches = []
+
+    def launch(args, **kwargs):
+        launches.append((args, kwargs))
+        return Child()
+
+    monkeypatch.setattr(service.subprocess, "Popen", launch)
+    assert service.start_service()[0]
+    assert launches == [
+        (
+            [sys.executable, "-m", "transcriber.service", "--child"],
+            {
+                "stdin": subprocess.DEVNULL,
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.DEVNULL,
+                "creationflags": (
+                    subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+                ),
+            },
+        )
+    ]
+
+
 def test_launcher_reports_success_only_after_ready(monkeypatch):
     class Child:
         stdout = io.BytesIO(b"ready\n")
