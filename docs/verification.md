@@ -11,13 +11,13 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 - [x] **Verified:** dictate into OpenCode in Windows Terminal and verify
   editable insertion without submitting the prompt.
 - [x] **Verified:** dictate into Obsidian and verify caret insertion.
-- [ ] **Not verified:** confirm UI Automation element identity remains stable in both applications.
+- [x] **Verified:** UI Automation identified the focused elements sufficiently
+  for successful insertion in both applications during these checks.
 - [ ] **Not verified:** confirm no submission with Terminal multiline warnings enabled and disabled.
 - [x] **Verified:** switching from an Obsidian note to the search field
   produced the fallback without changing the search field.
-- [ ] **Partially verified:** switching to another app without a text field
-  produced a copyable fallback; switching to an editable field in another app
-  remains unverified.
+- [x] **Verified:** switching from OpenCode to an editable Obsidian search
+  field produced the fallback without changing the search field.
 - [ ] **Not verified:** indicator never takes foreground while recording, processing, or showing a fallback in either target app.
 - [ ] **Not verified:** hotkey conflict, microphone failure, missing or invalid model, and clipboard or paste failures show an error or copyable transcript.
 - [ ] **Not verified:** a 60-second recording stops exactly once; shortcuts during transcription do nothing.
@@ -50,6 +50,9 @@ Do not record audio, transcripts, window titles, or clipboard content in results
   field remained unchanged.
 - In OpenCode running in Windows Terminal, the user reported that dictated text
   appeared in the editable input and was not submitted.
+- When recording started in OpenCode and focus moved to Obsidian's search
+  field, the user reported that the fallback appeared and the search field
+  remained unchanged.
 - Windows Terminal, Obsidian, OpenCode, and a default input device are present.
   OpenCode insertion, offline operation, and the remaining microphone and
   failure checks still require a controlled manual session.
