@@ -17,6 +17,7 @@ from transcriber.recognizer import RecognitionError, Recognizer
 def vad_model(tmp_path, monkeypatch):
     from transcriber import recognizer as module
 
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
     path = Paths.for_home(tmp_path).vad_model
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"test-vad")

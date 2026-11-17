@@ -7,6 +7,7 @@ import uuid
 from transcriber.config import MAX_SECONDS, MODEL_NAME, SAMPLE_RATE
 from transcriber.diagnostics import log_event
 from transcriber.insertion import WindowsInsertion, paste_text, safe_text
+from transcriber.microphones import MicrophoneError
 from transcriber.targets import capture_target, still_focused
 
 
@@ -99,12 +100,17 @@ class SessionController:
             self.state = "recording"
             self.show_state("recording", None)
             self.schedule(MAX_SECONDS, lambda: self._limit_for(generation))
-        except Exception:
+        except Exception as exc:
             self.state = "idle"
             log_event(
                 self.logger, self.session_id, "error", error_category="microphone"
             )
-            self.show_state("error", "Microphone could not be opened.")
+            message = (
+                str(exc)
+                if isinstance(exc, MicrophoneError)
+                else "Microphone could not be opened."
+            )
+            self.show_state("error", message)
 
     def _limit_for(self, generation):
         if generation == self.generation:

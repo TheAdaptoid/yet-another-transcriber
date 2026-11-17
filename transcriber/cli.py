@@ -5,6 +5,63 @@ from rich.console import Console
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
+microphone_app = typer.Typer(no_args_is_help=True)
+app.add_typer(
+    microphone_app, name="microphone", help="List or select input microphones."
+)
+
+
+@microphone_app.command("list")
+def microphone_list() -> None:
+    """List input microphones and the current selection."""
+    from transcriber import microphones
+
+    try:
+        try:
+            selection = microphones.read_selection()
+            selection_error = None
+        except microphones.MicrophoneError as exc:
+            selection = None
+            selection_error = exc
+        for index, name, api in microphones.input_devices():
+            default = " (default)" if index == microphones.sd.default.device[0] else ""
+            selected = " (selected)" if (name, api) == selection else ""
+            console.print(f"{index}: {name} [{api}]{default}{selected}", markup=False)
+        if selection_error is not None:
+            raise selection_error
+        if selection is None:
+            console.print("Selection: Windows default input.")
+        else:
+            microphones.resolve_device()
+    except microphones.MicrophoneError as exc:
+        console.print(str(exc))
+        raise typer.Exit(code=1) from exc
+
+
+@microphone_app.command("select")
+def microphone_select(index: int) -> None:
+    """Select an input microphone by its current list index."""
+    from transcriber import microphones
+
+    try:
+        microphones.select_device(index)
+    except microphones.MicrophoneError as exc:
+        console.print(str(exc))
+        raise typer.Exit(code=1) from exc
+    console.print("Microphone selected.")
+
+
+@microphone_app.command("clear")
+def microphone_clear() -> None:
+    """Use the default input microphone."""
+    from transcriber import microphones
+
+    try:
+        microphones.clear_selection()
+    except microphones.MicrophoneError as exc:
+        console.print(str(exc))
+        raise typer.Exit(code=1) from exc
+    console.print("Using the default input microphone.")
 
 
 @app.command()

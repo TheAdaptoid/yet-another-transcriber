@@ -9,6 +9,7 @@ import numpy as np
 import sounddevice as sd
 
 from transcriber.config import MAX_SECONDS, SAMPLE_RATE
+from transcriber.microphones import CHANNELS, DTYPE, MicrophoneError, resolve_device
 
 
 class Recorder:
@@ -47,13 +48,24 @@ class Recorder:
                     self._count += chunk.size
 
         try:
+            device = resolve_device()
             self._stream = self._stream_factory(
-                samplerate=SAMPLE_RATE, channels=1, dtype="int16", callback=callback
+                device=device,
+                samplerate=SAMPLE_RATE,
+                channels=CHANNELS,
+                dtype=DTYPE,
+                callback=callback,
             )
             self._stream.start()
-        except Exception:
+        except MicrophoneError:
             self.close()
             raise
+        except Exception:
+            self.close()
+            raise MicrophoneError(
+                "Microphone could not be opened. "
+                "Run 'yat doctor' and 'yat microphone list'."
+            ) from None
 
     def stop(self):
         """Stop the stream and return a copy of the recorded samples."""
