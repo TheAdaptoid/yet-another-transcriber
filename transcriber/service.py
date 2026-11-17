@@ -1,6 +1,10 @@
 """Windows synchronization primitives for the background instance."""
 
 import ctypes
+import queue
+import subprocess
+import sys
+import threading
 from ctypes import wintypes
 
 _kernel = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -84,3 +88,118 @@ class InstanceSignals:
             _kernel.ReleaseMutex(self._mutex)
             _kernel.CloseHandle(self._mutex)
             self._mutex = None
+
+
+def _instance_name() -> str:
+    """Derive a session-local name from the current Windows user SID."""
+    advapi = ctypes.WinDLL("advapi32", use_last_error=True)
+    token = wintypes.HANDLE()
+    advapi.OpenProcessToken.argtypes = (
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.HANDLE),
+    )
+    advapi.GetTokenInformation.argtypes = (
+        wintypes.HANDLE,
+        ctypes.c_int,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.DWORD),
+    )
+    advapi.ConvertSidToStringSidW.argtypes = (
+        wintypes.LPVOID,
+        ctypes.POINTER(wintypes.LPWSTR),
+    )
+    _kernel.GetCurrentProcess.restype = wintypes.HANDLE
+    _kernel.LocalFree.argtypes = (wintypes.HLOCAL,)
+    _kernel.LocalFree.restype = wintypes.HLOCAL
+    if not advapi.OpenProcessToken(_kernel.GetCurrentProcess(), 8, ctypes.byref(token)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        size = wintypes.DWORD()
+        advapi.GetTokenInformation(token, 1, None, 0, ctypes.byref(size))
+        buffer = ctypes.create_string_buffer(size.value)
+        if not advapi.GetTokenInformation(token, 1, buffer, size, ctypes.byref(size)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        sid = ctypes.cast(buffer, ctypes.POINTER(ctypes.c_void_p)).contents.value
+        text = wintypes.LPWSTR()
+        if not advapi.ConvertSidToStringSidW(sid, ctypes.byref(text)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            value = text.value
+            if value is None:
+                raise RuntimeError("Windows returned an empty user SID")
+            return "Local\\yat-" + value
+        finally:
+            _kernel.LocalFree(ctypes.cast(text, wintypes.HLOCAL))
+    finally:
+        _kernel.CloseHandle(token)
+
+
+def _read_startup(child, timeout: float) -> str | None:
+    messages = queue.Queue()
+
+    def read():
+        try:
+            messages.put(child.stdout.readline().decode("utf-8").strip())
+        except (OSError, ValueError, UnicodeError):
+            messages.put("")
+
+    threading.Thread(target=read, daemon=True).start()
+    try:
+        return messages.get(timeout=timeout)
+    except queue.Empty:
+        return None
+
+
+def start_service() -> tuple[bool, str]:
+    """Start a detached instance and wait for its readiness message."""
+    try:
+        child = subprocess.Popen(
+            [sys.executable, "-m", "transcriber.service", "--child"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            creationflags=(
+                subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            ),
+        )
+    except OSError:
+        return False, "Could not launch the background process."
+    result = _read_startup(child, 15.0)
+    if result == "ready":
+        return True, "Dictation started."
+    if result is None:
+        child.kill()
+        child.wait()
+        return False, "Startup timed out."
+    try:
+        child.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        child.kill()
+        child.wait()
+    if result == "error:already_running":
+        return False, "Dictation is already running."
+    if result == "error:assets_or_hotkey":
+        return False, "Startup failed: check local assets and the hotkey."
+    return False, "Background process failed before reporting readiness."
+
+
+def _child_main() -> int:
+    """Own the singleton and run the application until shutdown."""
+    signals = InstanceSignals.acquire(_instance_name())
+    if signals is None:
+        print("error:already_running", flush=True)
+        return 1
+    try:
+        from transcriber.__main__ import main
+
+        return main(signals=signals, report=lambda value: print(value, flush=True))
+    finally:
+        signals.close()
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--child"]:
+        raise SystemExit(_child_main())
+    raise SystemExit(2)
