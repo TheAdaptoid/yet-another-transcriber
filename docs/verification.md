@@ -20,7 +20,8 @@ Do not record audio, transcripts, window titles, or clipboard content in results
   produced the fallback without changing the search field.
 - [x] **Verified:** switching from OpenCode to an editable Obsidian search
   field produced the fallback without changing the search field.
-- [ ] **Not verified:** indicator never takes foreground while recording, processing, or showing a fallback in either target app.
+- [x] **Verified:** the user reported no focus theft by the indicator during
+  recording, processing, or fallback in the Obsidian and OpenCode tests.
 - [ ] **Not verified:** hotkey conflict, microphone failure, missing or invalid model, and clipboard or paste failures show an error or copyable transcript.
 - [x] **Verified:** the user reported that a quiet recording stopped
   automatically after about 60 seconds and left the input empty. The user also
