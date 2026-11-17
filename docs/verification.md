@@ -26,8 +26,9 @@ Do not record audio, transcripts, window titles, or clipboard content in results
   With Silero VAD, the user repeated a quiet five-second recording in OpenCode
   and reported that the input remained empty. Real background-noise checks
   remain unverified.
-- [ ] **Not verified:** quiet and normal speech, including short utterances and
-  words at the start and end of recordings, survive VAD without clipping.
+- [ ] **Partially verified:** the user reported that a normal short sentence and
+  a separate short utterance appeared with their first and last words. Quiet
+  speech and other boundary cases remain unverified.
 - [ ] **Not verified:** music and speech-like background noise do not cause
   unwanted text insertion.
 - [ ] **Not verified:** disconnect networking after setup, restart, and dictate successfully.
