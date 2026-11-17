@@ -12,7 +12,9 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 - [x] **Verified:** dictate into Obsidian and verify caret insertion.
 - [ ] **Not verified:** confirm UI Automation element identity remains stable in both applications.
 - [ ] **Not verified:** confirm no submission with Terminal multiline warnings enabled and disabled.
-- [ ] **Not verified:** switch to another field in the same app; no auto-paste occurs.
+- [ ] **Partially verified:** switching from an Obsidian note to the search
+  field produced the fallback; absence of text insertion in search remains
+  to be confirmed.
 - [ ] **Partially verified:** switching to another app without a text field
   produced a copyable fallback; switching to an editable field in another app
   remains unverified.
@@ -43,6 +45,8 @@ Do not record audio, transcripts, window titles, or clipboard content in results
   dictated text landed in the note. After focus moved to another application
   without a text field, the fallback appeared and the user copied and pasted
   its text into the scratch note.
+- The user also reported that the fallback appeared when focus moved from the
+  scratch Obsidian note to the search field in the same window.
 - Windows Terminal, Obsidian, OpenCode, and a default input device are present.
   OpenCode insertion, offline operation, and the remaining microphone and
   failure checks still require a controlled manual session.
