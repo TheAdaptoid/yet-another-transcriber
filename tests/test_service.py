@@ -147,3 +147,42 @@ def test_launcher_reports_duplicate_instance(monkeypatch):
     ok, message = service.start_service()
     assert not ok
     assert "already running" in message.lower()
+
+
+def test_detached_child_handshake_duplicate_and_stop(monkeypatch):
+    import sys
+    from concurrent.futures import ThreadPoolExecutor
+
+    name = f"Local\\yat-integration-{uuid.uuid4().hex}"
+    code = f"""
+import time
+from transcriber import service
+import transcriber.__main__ as runtime
+service._instance_name = lambda: {name!r}
+def fake_main(signals, report):
+    report("ready")
+    while not signals.stop_requested():
+        time.sleep(0.01)
+    return 0
+runtime.main = fake_main
+raise SystemExit(service._child_main())
+"""
+    real_popen = service.subprocess.Popen
+
+    def launch(args, **kwargs):
+        return real_popen([sys.executable, "-c", code], **kwargs)
+
+    monkeypatch.setattr(service.subprocess, "Popen", launch)
+    monkeypatch.setattr(service, "_instance_name", lambda: name)
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(lambda _: service.start_service(), range(2)))
+        assert sum(ok for ok, _ in results) == 1
+        assert any("already running" in message.lower() for _, message in results)
+        ok, message = service.stop_service()
+        assert ok, message
+        ok, message = service.stop_service()
+        assert ok
+        assert "not running" in message.lower()
+    finally:
+        service.stop_service()
