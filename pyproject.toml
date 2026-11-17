@@ -1,6 +1,6 @@
 [project]
 name = "yet-another-transcriber"
-version = "0.1.1"
+version = "0.1.3"
 requires-python = ">=3.13,<3.14"
 dependencies = ["sounddevice", "numpy", "comtypes", "typer", "rich"]
 
