@@ -15,6 +15,9 @@ uv. See the [README](README.md#requirements) for links and setup details.
 
 The automated tests use fakes for the microphone and recognizer. Most changes
 do not require a model download or a working microphone.
+For a locally installed command, follow the README's `uv tool install`
+instructions. Use `yat doctor`, `yat start`, and `yat stop` to check and run it.
+Stop an existing instance before testing lifecycle changes.
 
 ## Check your changes
 
@@ -22,13 +25,13 @@ Run these commands from the repository root:
 
 ```powershell
 uv sync --locked
-.\.venv\Scripts\ruff.exe check .
-.\.venv\Scripts\ruff.exe format --check .
-.\.venv\Scripts\ty.exe check
-.\.venv\Scripts\python.exe -m pytest -q
+uv run ruff check .
+uv run ruff format --check .
+uv run ty check
+uv run pytest -q
 ```
 
-Run `.\.venv\Scripts\ruff.exe format .` to format files when needed. Add tests
+Run `uv run ruff format .` to format files when needed. Add tests
 for behavior changes and bug fixes. For changes to audio, focus, insertion, or
 the indicator, record any manual checks and any unverified cases in the pull
 request. Use [the verification checklist](docs/verification.md) as a guide.

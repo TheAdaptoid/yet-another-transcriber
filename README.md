@@ -7,7 +7,7 @@ Windows Terminal and for Obsidian. Press **Win+Alt+S** to start recording, and
 press it again to stop. The app transcribes English speech on your PC and
 pastes the result at the original cursor.
 
-This is an early personal utility, not a packaged application. It has been
+This is an early personal utility. It has been
 tested on one Windows 11 PC; your microphone, apps, and shortcut assignments
 may behave differently. See [verification results](docs/verification.md).
 
@@ -38,14 +38,17 @@ may behave differently. See [verification results](docs/verification.md).
 
 ## Set up
 
-Clone this repository and open PowerShell in its root directory. Then run:
+Clone this repository and open PowerShell in its root directory. Install the
+local Python tool and set up the speech engine and models:
 
 ```powershell
-uv sync --python 3.13
+uv tool install --python 3.13 .
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-local.ps1
 ```
 
-Setup builds the pinned CPU CLI and downloads the English speech model and VAD
+The Python tool does not need a package-index release. Its Python dependencies
+can still come from the configured package sources. The separate setup script
+builds the pinned CPU CLI and downloads the English speech model and VAD
 model. It checks the model hashes and writes an installation manifest under
 `%USERPROFILE%\.yat`. The speech model download is approximately 142 MiB.
 
@@ -56,15 +59,19 @@ For an existing installation that needs the VAD model, run:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-vad.ps1
 ```
 
+If `yat` is not found, run `uv tool update-shell` and open a new terminal.
+Keep the checkout for asset setup and local updates.
+
 ## Run and dictate
 
-From the repository root, start the app:
+From any terminal directory, check the installation and start the app:
 
 ```powershell
-.\.venv\Scripts\python.exe -m transcriber
+yat doctor
+yat start
 ```
 
-Keep the PowerShell window open while you use the app.
+`yat start` runs the app in the background, so you can close the terminal.
 
 1. Click the input in OpenCode or the note in Obsidian.
 2. Press **Win+Alt+S** and speak.
@@ -75,9 +82,26 @@ The app ignores shortcut presses while it transcribes or inserts text. A
 shortcut conflict or microphone problem appears as an error. If focus changes,
 the app shows a copyable result instead of pasting automatically.
 
-To stop the app, select **Exit** on the indicator, or press **Ctrl+C** in the
-PowerShell window. The indicator is hidden while the app is idle; press the
-shortcut to show it if you need its Exit button.
+To stop the app, run `yat stop` from a terminal or select **Exit** on the
+indicator. The indicator is hidden while the app is idle; press the shortcut
+to show it if you need its Exit button.
+
+## Update or uninstall
+
+After updating your checkout, install the new version from its root:
+
+```powershell
+uv tool install --force --python 3.13 .
+```
+
+Stop the app before updating. To remove the Python tool, run:
+
+```powershell
+uv tool uninstall yet-another-transcriber
+```
+
+Uninstalling the tool does not remove the separate assets and logs under
+`%USERPROFILE%\.yat`.
 
 ## Privacy and limitations
 
