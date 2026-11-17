@@ -14,7 +14,7 @@ def overlay(tk_master):
         yield window
     finally:
         if root.winfo_exists():
-            root.destroy()
+            window.close()
 
 
 def test_states_have_distinct_ribbons_and_real_text(overlay):
@@ -136,6 +136,49 @@ def test_layout_respects_tk_scaling(overlay, monkeypatch, scaling):
         overlay.present("copy", "Sample text " * 120)
         _assert_within(overlay.root, area)
         assert overlay.copy_button.winfo_manager()
+    finally:
+        overlay.root.tk.call("tk", "scaling", prior)
+
+
+@pytest.mark.parametrize("state", ["copy", "error"])
+@pytest.mark.parametrize(
+    ("area", "scaling"),
+    [((0, 0, 320, 240), None), ((0, 0, 420, 300), 1.5)],
+)
+def test_small_work_area_keeps_actions_and_text_readable(
+    overlay, monkeypatch, state, area, scaling
+):
+    monkeypatch.setattr(overlay, "_work_area", lambda: area)
+    prior = float(overlay.root.tk.call("tk", "scaling"))
+    if scaling is not None:
+        overlay.root.tk.call("tk", "scaling", scaling)
+    text = (
+        "\n".join(f"Example line {n}" for n in range(100))
+        if state == "copy"
+        else "Microphone" * 160
+    )
+    try:
+        overlay.present(state, text)
+        overlay.root.update()
+        _assert_within(overlay.root, area)
+        assert overlay.close_button.winfo_height() >= 25
+        assert overlay.dismiss_button.winfo_height() >= 25
+        details = overlay.transcript if state == "copy" else overlay.error_details
+        if state == "copy":
+            assert overlay.copy_button.winfo_height() >= 25
+            overlay.label.config(text="Copy failed. Select the text and try again.")
+            overlay.root.update()
+            assert overlay.copy_button.winfo_height() >= 25
+        assert details.winfo_height() >= 20
+        assert details.get("1.0", "end-1c") == text
+        scrollbar = next(
+            child
+            for child in details.master.winfo_children()
+            if isinstance(child, tk.Scrollbar)
+        )
+        assert scrollbar.winfo_ismapped()
+        assert scrollbar.winfo_width() >= 10
+        assert details.yview()[1] < 1
     finally:
         overlay.root.tk.call("tk", "scaling", prior)
 

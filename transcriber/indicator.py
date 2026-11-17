@@ -109,7 +109,7 @@ class _TkOverlay:
         self.error_details.pack(side="left", fill="both", expand=True)
         self.separator = tk.Frame(paper, height=2, bg=_INK)
         self.separator.pack(fill="x")
-        actions = tk.Frame(paper, bg=_PAPER, padx=10, pady=7)
+        actions = tk.Frame(paper, bg=_PAPER, padx=10, pady=4)
         actions.pack(fill="x")
         button_style = {
             "bg": _PAPER,
@@ -290,6 +290,7 @@ class _TkOverlay:
         line_height = max(1, text_font.metrics("linespace"))
         text_columns = max(10, min(38, (max_width - 58) // char_width))
         self.transcript.config(width=text_columns, height=6)
+        self.transcript_holder.pack_propagate(True)
         self.error_details.config(width=text_columns, height=4)
         self.label.config(wraplength=max(80, max_width - 37))
         self.root.update_idletasks()
@@ -318,8 +319,16 @@ class _TkOverlay:
             base_height = (
                 self.root.winfo_reqheight() - self.transcript_holder.winfo_reqheight()
             )
-            lines = min(6, max(2, (max_height - base_height) // line_height))
+            lines = min(6, max(1, (max_height - base_height) // line_height))
             self.transcript.config(height=lines)
+            self.root.update_idletasks()
+            if self.root.winfo_reqheight() > max_height:
+                available = max_height - (
+                    self.root.winfo_reqheight()
+                    - self.transcript_holder.winfo_reqheight()
+                )
+                self.transcript_holder.configure(height=max(1, available))
+                self.transcript_holder.pack_propagate(False)
 
         self.root.update_idletasks()
         width = min(max_width, max(round(260 * scale), self.root.winfo_reqwidth()))

@@ -32,7 +32,7 @@ color. Never encode state only in hue or in an animation.
   same window*. The shadow is intentionally hard-edged for this chosen visual
   world; it is not a second window or a focusable companion.
 - **Grouping:** ribbon content has 11 pixels of horizontal and 5 pixels of
-  vertical inset. The message uses 12/9 pixels; actions use 10/7 pixels and
+  vertical inset. The message uses 12/9 pixels; actions use 10/4 pixels and
   sit below the separator. Buttons have a 2-pixel square border, 7/3 pixels
   internal padding, and a visible keyboard focus highlight. Use breathing room
   between distinct groups, not between a label and its meaning.
