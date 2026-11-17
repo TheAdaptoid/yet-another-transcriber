@@ -33,6 +33,38 @@ A personal Windows 11 tool that saves typing in OpenCode (Windows Terminal) and 
 - Use `base.en` for the MVP; measure stop-to-insertion time with representative 5-, 15-, and 45-second dictations on the target PC. Record model-load and end-to-end timings. `small.en`, preloading, or Radeon acceleration are later changes only if measured latency or recognition quality makes them worthwhile.
 - Use `ruff` for linting and formatting, `ty` for static type checks, and `pytest` for tests. Pin their versions with the other development dependencies in `uv.lock`. The plan must include unit tests for state transitions and text safety, plus manual integration tests in OpenCode and Obsidian.
 
+## Mid-course correction: offline speech detection
+
+The first real-PC silence test inserted `[BLANK_AUDIO]` into OpenCode.
+Synthetic no-speech noise also produced hallucinated words.
+The existing PCM peak gate and marker filter do not establish silence safety.
+
+- Use whisper.cpp v1.9.5's built-in CPU-only voice activity detection (VAD).
+  The user selected Silero over WebRTC VAD after comparing the options.
+  Silero uses the existing CLI and needs no Python inference framework.
+  Unlike a whole-recording WebRTC gate, it extracts speech segments and can
+  clip word boundaries.
+- Pin the VAD model and its integrity hash during setup.
+  Keep the model under `~\.yat\models`; do not download it at runtime.
+- Use `ggml-silero-v5.1.2.bin` from
+  `https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin`.
+  Its SHA-256 is `29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf`.
+  Pass `--vad -vm <model-path>` to the pinned CLI on every recognition call.
+  Start with its v1.9.5 defaults; change them only after target-PC tests.
+- Require a positive speech detection before any transcript can be pasted.
+  If detection finds no speech, return an empty result and do not paste.
+- If the VAD model is missing, invalid, or fails, show an error and do not paste.
+  Do not fall back to recognition without VAD.
+- Keep the existing audio privacy, temporary file, focus, clipboard, and terminal safety rules.
+  Do not log VAD input, transcript text, or third-party output.
+- VAD is not a guarantee against hallucination.
+  It can reject quiet speech or accept background sounds as speech.
+  Measure false rejects, false detections, memory use, and latency on the target PC.
+- Test empty capture, quiet-room noise, and background noise without speech.
+  Test normal and quiet speech, including short utterances.
+  Report any false detection or rejected speech as a failed verification gate.
+- Do not call the MVP usable until implementation and real-PC checks are complete.
+
 ## Local diagnostics
 
 - Write detailed structured JSON-lines logs to `~\.yat\logs\app.jsonl`. Rotate at 5 MiB per file and keep five files total. Logs remain local.
@@ -44,7 +76,10 @@ A personal Windows 11 tool that saves typing in OpenCode (Windows Terminal) and 
 
 - Keep the app in the background: no main window or review step is needed for normal dictation.
 - A compact, fixed screen-corner indicator appears while recording, changes to a processing state after the second shortcut press, then disappears when the text is inserted. It must never activate or take focus away from OpenCode or Obsidian. Do not show a live transcript.
-- The second shortcut always ends recording and attempts insertion. There is no dedicated cancel action in the MVP; unwanted text can be deleted in the target app.
+- The second shortcut ends recording and starts processing. The app attempts
+  insertion only when speech is detected and the safety checks pass. There is no
+  dedicated cancel action in the MVP; unwanted text can be deleted in the target
+  app.
 - Use a small Tkinter corner overlay with Windows no-activate/tool-window styles for recording and processing. On success it closes after insertion. On microphone, model, hotkey, or insertion failure, show a plain-language error; when a transcript exists, leave it on the clipboard and show a dismissible fallback with the text/copy action. Do not pretend insertion succeeded.
 - No animation, sound, setup screens, configuration UI, or extra visual polish. Keep feedback legible and unobtrusive.
 

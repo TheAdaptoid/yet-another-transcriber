@@ -1,0 +1,14 @@
+[project]
+name = "yet-another-transcriber"
+version = "0.1.0"
+requires-python = ">=3.13,<3.14"
+dependencies = ["sounddevice", "numpy", "comtypes"]
+
+[dependency-groups]
+dev = ["pytest", "ruff", "ty"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
