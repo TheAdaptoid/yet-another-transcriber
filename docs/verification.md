@@ -22,7 +22,10 @@ Do not record audio, transcripts, window titles, or clipboard content in results
   field produced the fallback without changing the search field.
 - [x] **Verified:** the user reported no focus theft by the indicator during
   recording, processing, or fallback in the Obsidian and OpenCode tests.
-- [ ] **Not verified:** hotkey conflict, microphone failure, missing or invalid model, and clipboard or paste failures show an error or copyable transcript.
+- [ ] **Partially verified:** real hotkey conflict and simulated invalid assets,
+  microphone failure, and paste failure showed visible errors or a copyable
+  fallback without focus theft. Physical microphone disconnection and actual
+  clipboard failure remain unverified.
 - [x] **Verified:** the user reported that a quiet recording stopped
   automatically after about 60 seconds and left the input empty. The user also
   reported that a shortcut during transcription was ignored.
