@@ -225,6 +225,32 @@ def test_invalid_vad_never_launches_cli(tmp_path, vad_model, mutation):
     assert not list(paths.tmp.glob("yat-*.wav"))
 
 
+def test_vad_model_is_locked_against_changes_until_cli_finishes(tmp_path, vad_model):
+    paths = Paths.for_home(tmp_path)
+    paths.cli.parent.mkdir(parents=True)
+    paths.cli.touch()
+    blocked = []
+
+    class Process:
+        returncode = 0
+
+        def communicate(self, timeout):
+            return ("", "")
+
+    def launch(*args, **kwargs):
+        try:
+            vad_model.write_bytes(b"changed")
+        except PermissionError:
+            blocked.append(True)
+        return Process()
+
+    recognizer = Recognizer(make_logger(paths.log), popen=launch)
+    assert recognizer.transcribe(np.array([1000], dtype=np.int16), paths, "a") == ""
+    assert blocked == [True]
+    assert vad_model.read_bytes() == b"test-vad"
+    vad_model.write_bytes(b"after close")
+
+
 def test_vad_cli_failure_never_returns_speech(tmp_path):
     paths = Paths.for_home(tmp_path)
     paths.cli.parent.mkdir(parents=True)

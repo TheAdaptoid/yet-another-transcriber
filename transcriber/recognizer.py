@@ -1,16 +1,44 @@
 """Run the pinned local speech recognizer without logging speech."""
 
+import ctypes
 import hashlib
 import logging
 import subprocess
 import threading
 import time
+from contextlib import contextmanager
+from ctypes import wintypes
 
 import numpy as np
 
 from transcriber.audio import write_temp_wav
 from transcriber.config import VAD_SHA256, Paths
 from transcriber.diagnostics import log_event
+
+
+@contextmanager
+def _lock_vad_file(paths: Paths):
+    """Deny model modification and replacement until the CLI finishes."""
+    kernel = ctypes.windll.kernel32
+    create = kernel.CreateFileW
+    create.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    ]
+    create.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = create(str(paths.vad_model), 0x80000000, 1, None, 3, 0x80, None)
+    if handle == ctypes.c_void_p(-1).value:
+        raise RecognitionError("model")
+    try:
+        yield
+    finally:
+        kernel.CloseHandle(handle)
 
 
 class RecognitionError(Exception):
@@ -56,7 +84,8 @@ class Recognizer:
                 raise RecognitionError("cli_failed")
             self._done.clear()
         try:
-            return self._transcribe(samples, paths, session_id)
+            with _lock_vad_file(paths):
+                return self._transcribe(samples, paths, session_id)
         finally:
             self._done.set()
 

@@ -13,6 +13,7 @@ $nonce = [guid]::NewGuid().ToString("N")
 $download = Join-Path $models ("yat-vad-" + $nonce + ".download")
 $manifestTemp = "$manifestPath.$nonce.tmp"
 $manifestBackup = "$manifestPath.$nonce.bak"
+$modelBackup = "$target.$nonce.bak"
 New-Item -ItemType Directory -Force -Path $models | Out-Null
 try {
     Invoke-WebRequest "https://huggingface.co/ggml-org/whisper-vad/resolve/main/$name" -OutFile $download
@@ -21,8 +22,21 @@ try {
     }
     $manifest | Add-Member -NotePropertyName vad_sha256 -NotePropertyValue $expected -Force
     $manifest | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8 -LiteralPath $manifestTemp
+    $hadModel = Test-Path -LiteralPath $target -PathType Leaf
+    if ($hadModel) { Copy-Item -LiteralPath $target -Destination $modelBackup }
     Move-Item -LiteralPath $download -Destination $target -Force
-    [System.IO.File]::Replace($manifestTemp, $manifestPath, $manifestBackup)
+    try {
+        [System.IO.File]::Replace($manifestTemp, $manifestPath, $manifestBackup)
+    } catch {
+        if ($hadModel) {
+            [System.IO.File]::Copy($modelBackup, $target, $true)
+            Remove-Item -LiteralPath $modelBackup -Force
+        } else {
+            Remove-Item -LiteralPath $target -Force
+        }
+        throw
+    }
+    if ($hadModel) { Remove-Item -LiteralPath $modelBackup -Force }
     Remove-Item -LiteralPath $manifestBackup -Force
     Write-Host "Installed and verified offline Silero VAD."
 } finally {

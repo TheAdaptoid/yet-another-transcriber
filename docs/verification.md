@@ -25,6 +25,10 @@ Do not record audio, transcripts, window titles, or clipboard content in results
   `[BLANK_AUDIO]` marker that was inserted into OpenCode. A separate synthetic
   noise test also produced hallucinated words. The low-level PCM noise gate is
   not a voice activity detector.
+- [ ] **Not verified:** quiet and normal speech, including short utterances and
+  words at the start and end of recordings, survive VAD without clipping.
+- [ ] **Not verified:** music and speech-like background noise do not cause
+  unwanted text insertion.
 - [ ] **Not verified:** disconnect networking after setup, restart, and dictate successfully.
 - [ ] **Not verified:** orphan audio is removed and log rotation preserves privacy.
 

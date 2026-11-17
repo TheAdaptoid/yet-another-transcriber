@@ -1,10 +1,13 @@
 $ErrorActionPreference = "Stop"
+$root = Join-Path $env:USERPROFILE ".yat"
+if (Test-Path -LiteralPath (Join-Path $root "bin/manifest.json")) {
+    throw "Existing installation detected. Use setup-vad.ps1 for the VAD update."
+}
 foreach ($tool in @("git", "cmake")) {
     if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
         throw "Required setup tool not found: $tool"
     }
 }
-$root = Join-Path $env:USERPROFILE ".yat"
 $bin = Join-Path $root "bin"
 $models = Join-Path $root "models"
 $tmp = Join-Path $root "tmp"
