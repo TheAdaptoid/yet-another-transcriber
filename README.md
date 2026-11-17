@@ -2,8 +2,8 @@
 
 **Speak locally. Paste deliberately.**
 
-Yet Another Transcriber is a small Windows dictation utility for OpenCode in
-Windows Terminal and for Obsidian. Press **Win+Alt+S** to start recording.
+Yet Another Transcriber is a small Windows dictation utility.
+Press **Win+Alt+S** to start recording.
 Press **Win+Alt+S** again to stop recording. The app transcribes English speech on your PC and
 pastes the result at the original cursor.
 
@@ -17,7 +17,7 @@ Behavior can differ with your microphone, apps, and shortcut assignments.
 - Records one utterance at a time, up to 60 seconds.
 - Shows a corner indicator while recording and transcribing.
 - Checks the original window **and** focused element before pasting.
-- Keeps Terminal input on one line and sends **Ctrl+V**, never Enter.
+- Keeps automatically pasted text on one line and sends **Ctrl+V**, never Enter.
 - Shows a copyable result if it cannot confirm the original target or if paste
   fails.
 
@@ -32,7 +32,7 @@ Behavior can differ with your microphone, apps, and shortcut assignments.
   C++ build tools and Windows SDK. Install Visual Studio or Visual Studio Build
   Tools. Include the **Desktop development with C++** workload.
 - [uv](https://docs.astral.sh/uv/) and Python 3.13. `uv` can install Python.
-- Windows Terminal with OpenCode, or Obsidian.
+- A target application that accepts Ctrl+V and exposes a stable focused element.
 - Network access for the first setup. Setup downloads source code and models.
 
 ## Set up
@@ -76,11 +76,11 @@ yat start
 > previous contents. Before you paste a fallback into a terminal, check that
 > the text is on one line.
 
-1. Click the input in OpenCode or the note in Obsidian.
+1. Click an input in the target application.
 2. Press **Win+Alt+S**.
 3. Speak.
 4. Press **Win+Alt+S** again. The app also stops recording after 60 seconds.
-5. Review the pasted text. In OpenCode, submit it yourself if you want to.
+5. Review the pasted text. Submit it yourself if you want to.
 
 The app ignores shortcut presses while it transcribes or inserts text. A
 shortcut conflict or microphone problem appears as an error. If focus changes,
@@ -120,9 +120,13 @@ Uninstalling the tool does not remove the separate assets and logs under
 - The app replaces the Windows clipboard with the result and does not restore
   its previous contents. If you manually paste a fallback into a terminal,
   check that it is a single line first.
-- The app pastes automatically only into supported Windows Terminal and
-  Obsidian windows. The app must also identify the focused element. For other
-  targets, the app shows a copyable result.
+- The app requires the same foreground window and UI Automation element before
+  paste. It rejects elements reported as disabled or password fields. Applications
+  differ in their UI Automation and Ctrl+V support; compatibility is not guaranteed.
+  A focus check and Ctrl+V cannot be atomic. Sending Ctrl+V does not prove that
+  the target accepted the text. Check the result before you submit it.
+- Automatic paste removes line breaks and control characters in every target.
+  The app shows a copyable result if it cannot confirm a target or send the paste.
 
 ## Contributing and license
 

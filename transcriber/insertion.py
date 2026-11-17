@@ -5,15 +5,13 @@ import re
 import time
 import unicodedata
 from ctypes import wintypes
-from typing import Callable, Literal
+from typing import Callable
 
 _ANSI = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\)|[@-_])")
 
 
-def safe_text(text: str, kind: Literal["terminal", "obsidian"]) -> str:
-    """Make terminal input a single line; preserve normal editor text."""
-    if kind == "obsidian":
-        return text
+def safe_text(text: str) -> str:
+    """Make input a single line without terminal control sequences."""
     text = _ANSI.sub("", text)
     text = "".join(" " if unicodedata.category(c).startswith("C") else c for c in text)
     return " ".join(text.split())
