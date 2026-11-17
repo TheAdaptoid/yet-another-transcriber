@@ -93,10 +93,11 @@ Record cold and warm results separately, without transcript content. Use
 | 15 seconds | Not verified | Not verified | Not verified |
 | 45 seconds | Not verified | Not verified | Not verified |
 
-Two user-requested dictations produced the following observations.
+Three user-requested dictations produced the following observations.
 Their cold/warm status was not recorded.
 
 | Captured audio | Inference | Stop to insertion |
 |---|---|---|
+| 7.93 seconds | 0.99 seconds | 1.09 seconds |
 | 12.35 seconds | 1.11 seconds | 1.48 seconds |
 | 50.52 seconds | 3.27 seconds | 3.37 seconds |
