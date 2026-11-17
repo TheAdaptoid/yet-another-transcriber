@@ -13,7 +13,9 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 - [x] **Verified:** dictate into Obsidian and verify caret insertion.
 - [x] **Verified:** UI Automation identified the focused elements sufficiently
   for successful insertion in both applications during these checks.
-- [ ] **Not verified:** confirm no submission with Terminal multiline warnings enabled and disabled.
+- [ ] **Partially verified:** the user reported that ordinary dictation remained
+  editable without submission with Terminal multiline warnings both on and off.
+  A transcript containing line breaks has not been tested in the real prompt.
 - [x] **Verified:** switching from an Obsidian note to the search field
   produced the fallback without changing the search field.
 - [x] **Verified:** switching from OpenCode to an editable Obsidian search
