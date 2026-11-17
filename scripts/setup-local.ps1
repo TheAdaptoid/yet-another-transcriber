@@ -49,4 +49,5 @@ Get-ChildItem "$release/*.dll" | ForEach-Object {
     cli_sha256 = $cliHash
     dll_sha256 = $dllHashes
 } | ConvertTo-Json | Set-Content -Encoding utf8 "$bin/manifest.json"
+& "$PSScriptRoot/setup-vad.ps1"
 Write-Host "Installed whisper.cpp v1.9.5 CPU CLI and verified model."

@@ -117,6 +117,7 @@ def test_asset_validation_rejects_changes(tmp_path, monkeypatch):
     paths.model.parent.mkdir(parents=True)
     paths.cli.parent.mkdir(parents=True)
     paths.model.write_bytes(b"model")
+    paths.vad_model.write_bytes(b"vad")
     paths.cli.write_bytes(b"cli")
     dll = paths.cli.parent / "whisper.dll"
     dll.write_bytes(b"dll")
@@ -125,18 +126,33 @@ def test_asset_validation_rejects_changes(tmp_path, monkeypatch):
         return hashlib.sha256(data).hexdigest()
 
     monkeypatch.setattr(runtime, "MODEL_SHA256", digest(b"model"))
+    monkeypatch.setattr(runtime, "VAD_SHA256", digest(b"vad"))
     (paths.cli.parent / "manifest.json").write_text(
         json.dumps(
             {
                 "version": "v1.9.5",
                 "source_commit": runtime.SOURCE_COMMIT,
                 "model_sha256": digest(b"model"),
+                "vad_sha256": digest(b"vad"),
                 "cli_sha256": digest(b"cli"),
                 "dll_sha256": {"whisper.dll": digest(b"dll")},
             }
         )
     )
     assert runtime.check_assets(paths)
+    paths.vad_model.write_bytes(b"changed")
+    assert not runtime.check_assets(paths)
+    paths.vad_model.write_bytes(b"vad")
+    manifest_path = paths.cli.parent / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["vad_sha256"] = digest(b"wrong")
+    manifest_path.write_text(json.dumps(manifest))
+    assert not runtime.check_assets(paths)
+    manifest["vad_sha256"] = digest(b"vad")
+    manifest_path.write_text(json.dumps(manifest))
+    paths.vad_model.unlink()
+    assert not runtime.check_assets(paths)
+    paths.vad_model.write_bytes(b"vad")
     paths.cli.write_bytes(b"tampered")
     assert not runtime.check_assets(paths)
     paths.cli.write_bytes(b"cli")

@@ -12,6 +12,7 @@ def test_paths_are_under_user_home():
     paths = Paths.for_home(Path("C:/Users/Test"))
     assert paths.root == Path("C:/Users/Test/.yat")
     assert paths.model == paths.root / "models" / MODEL_NAME
+    assert paths.vad_model == paths.root / "models" / "ggml-silero-v5.1.2.bin"
     assert paths.cli == paths.root / "bin" / "whisper-cli.exe"
     assert paths.tmp == paths.root / "tmp"
     assert paths.log == paths.root / "logs" / "app.jsonl"

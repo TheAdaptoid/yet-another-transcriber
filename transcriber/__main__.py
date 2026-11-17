@@ -9,7 +9,7 @@ import tkinter as tk
 from pathlib import Path
 
 from transcriber.audio import Recorder, cleanup_temp_wavs
-from transcriber.config import Paths
+from transcriber.config import VAD_SHA256, Paths
 from transcriber.diagnostics import make_logger
 from transcriber.hotkey import HotkeyListener
 from transcriber.indicator import Indicator
@@ -51,6 +51,8 @@ def check_assets(paths: Paths) -> bool:
             and manifest["source_commit"] == SOURCE_COMMIT
             and manifest["model_sha256"] == MODEL_SHA256
             and _sha256(paths.model) == MODEL_SHA256
+            and manifest["vad_sha256"] == VAD_SHA256
+            and _sha256(paths.vad_model) == VAD_SHA256
             and _sha256(paths.cli) == manifest["cli_sha256"]
         )
     except (OSError, ValueError, KeyError, TypeError):
