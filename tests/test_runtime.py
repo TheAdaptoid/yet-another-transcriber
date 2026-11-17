@@ -221,3 +221,46 @@ class FakeRecorder:
 
     def close(self):
         pass
+
+
+def test_managed_runtime_reports_ready_and_stops_on_loop_thread():
+    calls = []
+
+    class App:
+        def start(self):
+            calls.append("start")
+            return True
+
+        def shutdown(self):
+            calls.append("shutdown")
+
+    class Loop:
+        def after(self, delay, callback):
+            self.callback = callback
+
+        def mainloop(self):
+            calls.append("loop")
+            self.callback()
+
+    class Signals:
+        def stop_requested(self):
+            return True
+
+    result = runtime.run_managed(App(), Loop(), Signals(), calls.append)
+    assert result == 0
+    assert calls == ["start", "ready", "loop", "shutdown", "shutdown"]
+
+
+def test_managed_runtime_reports_start_failure_without_mainloop():
+    calls = []
+
+    class App:
+        def start(self):
+            return False
+
+        def shutdown(self):
+            calls.append("shutdown")
+
+    result = runtime.run_managed(App(), FakeLoop(), object(), calls.append)
+    assert result == 1
+    assert calls == ["error:assets_or_hotkey", "shutdown"]

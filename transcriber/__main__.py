@@ -135,7 +135,28 @@ class Runtime:
         self.indicator.close()
 
 
-def main() -> int:
+def run_managed(app, loop, signals, report) -> int:
+    """Run the app with readiness reporting and loop-thread shutdown."""
+    try:
+        if not app.start():
+            report("error:assets_or_hotkey")
+            return 1
+
+        def check_stop():
+            if signals.stop_requested():
+                app.shutdown()
+            elif not app.closed:
+                loop.after(100, check_stop)
+
+        loop.after(100, check_stop)
+        report("ready")
+        loop.mainloop()
+        return 0
+    finally:
+        app.shutdown()
+
+
+def main(signals=None, report=None) -> int:
     """Start the background app without fetching assets."""
     root = tk.Tk()
     paths = Paths.for_home(Path(os.environ["USERPROFILE"]))
@@ -149,6 +170,8 @@ def main() -> int:
     app = Runtime(
         paths=paths, indicator=indicator, listener=HotkeyListener(), loop=root
     )
+    if signals is not None and report is not None:
+        return run_managed(app, root, signals, report)
     app.start()
     try:
         root.mainloop()
