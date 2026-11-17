@@ -31,7 +31,8 @@ def test_rotating_logger_and_allowed_event(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "field", ["transcript", "audio", "clipboard", "window_title", "exception"]
+    "field",
+    ["transcript", "audio", "clipboard", "window_title", "exception", "process_name"],
 )
 def test_rejects_private_fields(tmp_path, field):
     logger = make_logger(tmp_path / "app.jsonl")

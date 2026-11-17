@@ -92,13 +92,6 @@ class SessionController:
         self.session_id = uuid.uuid4().hex
         try:
             self.target = self.capture()
-            if self.target is not None:
-                process = (
-                    "WindowsTerminal.exe"
-                    if self.target.kind == "terminal"
-                    else "Obsidian.exe"
-                )
-                log_event(self.logger, self.session_id, "target", process_name=process)
             started = self.clock()
             self.recorder.start()
             self._event("mic_open", started)
@@ -196,7 +189,7 @@ class SessionController:
         except Exception:
             valid = False
         self._event("focus_check", started)
-        output = safe_text(text, target.kind) if target is not None else text
+        output = safe_text(text) if target is not None else text
         success = False
         if valid and target is not None and output:
             started = self.clock()

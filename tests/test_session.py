@@ -49,7 +49,7 @@ def setup_controller(tmp_path):
     ui = []
     pastes = []
     copies = []
-    target = TargetSnapshot(42, (1, 2), "WindowsTerminal.exe", "terminal")
+    target = TargetSnapshot(42, (1, 2))
     clock = iter(range(10000))
     ctl = SessionController(
         paths=paths,
@@ -103,7 +103,7 @@ def test_session_transitions_timings_busy_and_one_id(tmp_path):
     assert any(
         event.get("output_characters") == len("private words") for event in events
     )
-    assert any(event.get("process_name") == "WindowsTerminal.exe" for event in events)
+    assert all("process_name" not in event for event in events)
     assert any(event.get("model") == "ggml-base.en.bin" for event in events)
     assert "private words" not in paths.log.read_text()
 
@@ -131,12 +131,21 @@ def test_missing_or_changed_focus_is_copyable_without_paste(tmp_path):
     assert pastes == []
     assert copies == ["private words"]
     assert states[-1] == ("copy", "private words")
-    ctl.capture = lambda: TargetSnapshot(42, (1,), "WindowsTerminal.exe", "terminal")
+    ctl.capture = lambda: TargetSnapshot(42, (1,))
     ctl.focused = lambda target: False
     ctl.on_hotkey()
     ctl.on_hotkey()
     finish_work(work, ui)
     assert not pastes and len(copies) == 2
+
+
+def test_session_sanitizes_multiline_text_before_automatic_paste(tmp_path):
+    ctl, _, recognizer, _, _, work, ui, pastes, _, _ = setup_controller(tmp_path)
+    recognizer.text = "first\r\nsecond\x1b[31m"
+    ctl.on_hotkey()
+    ctl.on_hotkey()
+    finish_work(work, ui)
+    assert pastes == ["first second"]
 
 
 def test_silence_and_error_never_paste(tmp_path):

@@ -15,7 +15,6 @@ _NUMERIC_FIELDS = {
 }
 _STRING_VALUES = {
     "model": {MODEL_NAME},
-    "process_name": {"WindowsTerminal.exe", "Obsidian.exe"},
     "error_category": {
         "microphone",
         "model",

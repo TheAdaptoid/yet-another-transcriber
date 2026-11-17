@@ -4,7 +4,7 @@ This is the architecture for Windows 11 personal dictation. All processing remai
 
 ```mermaid
 flowchart LR
-  User["User in OpenCode / Obsidian"] -->|Win + Alt + S| Hotkey["Windows global hotkey"]
+  User["User in a target application"] -->|Win + Alt + S| Hotkey["Windows global hotkey"]
   subgraph Local["Background Windows app — local only"]
     Hotkey --> Coordinator["Python session coordinator"]
     Coordinator -->|start| Focus["Remember foreground window + UIA focused element"]
@@ -14,11 +14,8 @@ flowchart LR
     ASR --> Transcript["Transcript in memory"]
     Transcript --> Target{"Original target<br/>still focused?"}
     Focus --> Target
-    Target -->|yes| Format{"Windows Terminal?"}
-    Format -->|yes| Safe["Single-line text<br/>no control characters"]
-    Format -->|no| Editor["Editor text"]
+    Target -->|yes| Safe["Single-line text<br/>no control characters"]
     Safe --> Paste["Clipboard + Ctrl+V<br/>no Enter key"]
-    Editor --> Paste
     Paste -->|success| Done["Transcript stays on clipboard"]
     Paste -->|uncertain / failed| Recovery["Copyable transcript<br/>no automatic retry"]
     Target -->|no / uncertain| Recovery
@@ -35,7 +32,7 @@ flowchart LR
 ```mermaid
 sequenceDiagram
   actor User
-  participant Target as OpenCode or Obsidian
+  participant Target as Target application
   participant App as Python background app
   participant UI as Corner indicator
   participant Mic as Microphone
@@ -65,7 +62,7 @@ sequenceDiagram
     alt Focus changed or cannot be verified
       App->>UI: Show copyable transcript, do not paste
     else Original target still focused
-      App->>App: Collapse controls and newlines for Windows Terminal
+      App->>App: Collapse controls and newlines
       App->>Clip: Set transcript as Unicode text
       App->>Target: Send Ctrl + V only
       alt Paste succeeded
@@ -78,6 +75,6 @@ sequenceDiagram
   end
 ```
 
-**Safety boundary:** the corner indicator never becomes the input target; the transcript is never sent to a cloud service. Terminal paste must be tested against the actual OpenCode input to confirm that text stays editable and no command is submitted. If focus or paste success cannot be verified, prefer a copyable result over guessing. Audio is temporary, with orphan cleanup on the next launch; there is no history.
+**Safety boundary:** the corner indicator never becomes the input target; the transcript is never sent to a cloud service. Test terminal paste to confirm that text stays editable and no command is submitted. If focus or paste success cannot be verified, prefer a copyable result over guessing. Audio is temporary, with orphan cleanup on the next launch; there is no history.
 
 **Diagnostics boundary:** structured local logs record stage durations, state changes, and sanitized errors. They exclude audio, transcript text, clipboard data, field contents, and window titles. `ruff`, `ty`, and `pytest` are required development checks; packaging is deferred.

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Dictate English locally on Windows 11 into OpenCode in Windows Terminal and Obsidian with Win+Alt+S, without submitting terminal input.
+**Goal:** Dictate English locally on Windows 11 into terminal and editor applications with Win+Alt+S, without submitting terminal input.
 
 **Architecture:** A Python background process owns a global hotkey, microphone capture, a non-activating corner indicator, and one dictation session at a time. Each utterance runs a pinned CPU `whisper-cli` against a temporary WAV; target verification precedes clipboard paste. Failures leave a copyable transcript when one exists. Structured local logs measure every stage without recording content.
 
@@ -19,7 +19,7 @@
 - Capture original foreground window **and** UI Automation focused-element identity. Never auto-paste if either changes or cannot be verified; do not silently downgrade this condition.
 - For Windows Terminal, normalize all line breaks, tabs, and controls to spaces. Only send Ctrl+V, never Enter; leave the result on the Unicode clipboard. Do not auto-retry uncertain paste.
 - Use a non-activating Tkinter corner indicator. Give visible errors and a copyable transcript on insertion/focus failure.
-- Use `ruff` for lint/format, `ty` for type checks, and `pytest` for tests. Verify OpenCode and Obsidian on the user's PC before calling the MVP usable.
+- Use `ruff` for lint/format, `ty` for type checks, and `pytest` for tests. Verify a terminal and editor on the user's PC before calling the MVP usable.
 
 ## Review Focus
 
@@ -81,10 +81,10 @@
 
 **Interfaces:**
 - Consumes: `log_event`.
-- Produces: frozen `TargetSnapshot(hwnd: int, runtime_id: tuple[int, ...], process_name: str, kind: Literal["terminal", "obsidian"])`; `capture_target() -> TargetSnapshot | None`; `still_focused(target: TargetSnapshot) -> bool`. Use `GetForegroundWindow` plus `comtypes` UI Automation focused-element runtime ID; recognize `WindowsTerminal.exe` and `Obsidian.exe`. No identity or unrecognized app means fallback, not insertion.
-- Produces: `safe_text(text: str, kind: Literal["terminal", "obsidian"]) -> str`; `paste_text(text: str) -> bool` places Unicode text on clipboard and sends Ctrl+V via Win32 `SendInput`, without Enter or clipboard restoration. A failed/uncertain paste leaves text on clipboard.
+- Historical design: capture a foreground window and UI Automation focused-element runtime ID with an application allowlist. The current implementation uses neutral target identity and fails closed if identity is unavailable.
+- Historical design: sanitize terminal text, then place Unicode text on the clipboard and send Ctrl+V without Enter or clipboard restoration. The current implementation sanitizes every automatic paste.
 
-- [ ] **Step 1: Write failing tests** for a changed HWND, a changed runtime ID in the same HWND, missing UIA identity, and unsupported process; each must deny insertion. Assert `safe_text("one\r\ntwo\t\x1b[31m", "terminal") == "one two"` (strip ANSI sequences; collapse whitespace), while ordinary Obsidian text remains unchanged. With fake Win32 calls, assert clipboard receives Unicode text, the only synthesized keystrokes are Ctrl down/V down/V up/Ctrl up, and the clipboard retains the transcript even on failure.
+- [ ] **Step 1: Write failing tests** for a changed HWND, a changed runtime ID in the same HWND, and missing UIA identity; each must deny insertion. Test ANSI removal and whitespace collapse. With fake Win32 calls, assert clipboard receives Unicode text, the only synthesized keystrokes are Ctrl down/V down/V up/Ctrl up, and the clipboard retains the transcript even on failure.
 - [ ] **Step 2: Run** `.\.venv\Scripts\python.exe -m pytest tests/test_targets_insertion.py -q`; expect FAIL for missing `targets`/`insertion`.
 - [ ] **Step 3: Implement** the snapshot, UIA comparison, app classification, safe text, clipboard write, and guarded `SendInput`. Do not use window title or textbox contents for identification. Check foreground/focus again immediately before `SendInput`; return false on uncertainty and never retry.
 - [ ] **Step 4: Run** `.\.venv\Scripts\python.exe -m pytest tests/test_targets_insertion.py -q`; expect PASS. If UIA cannot expose a stable focused element in either named app, mark its integration gate blocked for user review; do not weaken the check.
@@ -130,7 +130,7 @@
 - Consumes: structured log events from Task 1.
 - Produces: `summarize(path: Path) -> dict[str, object]` with per-stage count, median, and p95 for numeric durations; missing stages stay missing, not zero. A CLI prints the summary without printing transcript or paths to private audio.
 
-- [ ] **Step 1: Write failing tests** for summaries of repeated sessions, missing stages, malformed lines, and log events with unexpected text fields. Assert count/median/p95 and no content in output. Draft `docs/verification.md` with a checklist for real OpenCode and Obsidian use, Windows Terminal multiline warning on/off, focus switched to another field/app, indicator focus, conflict/mic/model/paste failure, 60-second cutoff, offline launch after setup, log rotation/privacy, and 5/15/45-second warm/cold latency observations.
+- [ ] **Step 1: Write failing tests** for summaries of repeated sessions, missing stages, malformed lines, and log events with unexpected text fields. Assert count/median/p95 and no content in output. Draft `docs/verification.md` with a checklist for real terminal and editor use, terminal multiline warning on/off, focus switched to another field/app, indicator focus, conflict/mic/model/paste failure, 60-second cutoff, offline launch after setup, log rotation/privacy, and 5/15/45-second warm/cold latency observations.
 - [ ] **Step 2: Run** `.\.venv\Scripts\python.exe -m pytest tests/test_log_summary.py -q`; expect FAIL for missing `summarize`.
 - [ ] **Step 3: Implement** the numeric summary CLI. Complete the actual-PC checklist when that machine is available; if not, mark each untested gate explicitly **not verified**, not passed. Never weaken focus/terminal safeguards to make a checklist pass.
 - [ ] **Step 4: Run** `uv sync --locked`, `.\.venv\Scripts\ruff.exe check .`, `.\.venv\Scripts\ruff.exe format --check .`, `.\.venv\Scripts\ty.exe check`, `.\.venv\Scripts\python.exe -m pytest -q`, and `.\.venv\Scripts\python.exe scripts/summarize-logs.py` against sample logs. Expect all checks green and no private content in output. Record actual manual-test and latency results separately; do not call the MVP usable if either target app or offline runtime remains unverified.
