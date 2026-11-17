@@ -6,6 +6,15 @@ from ctypes import wintypes
 
 from transcriber.insertion import WindowsInsertion
 
+_PAPER = "#F8EFD2"
+_INK = "#151515"
+_STATE_COLORS = {
+    "recording": "#F36746",
+    "transcribing": "#A6D4EF",
+    "error": "#F5CB5E",
+    "copy": "#F5CB5E",
+}
+
 
 class _TkOverlay:
     def __init__(self, root, on_close):
@@ -14,23 +23,95 @@ class _TkOverlay:
         self.root.withdraw()
         self.root.overrideredirect(True)
         self.root.attributes("-topmost", True)
-        self.frame = tk.Frame(root, bg="#222222", padx=12, pady=8)
-        self.frame.pack(fill="both", expand=True)
-        self.label = tk.Label(
-            self.frame, bg="#222222", fg="white", justify="left", wraplength=380
+        self.root.configure(bg=_INK)
+        self.frame = tk.Frame(root, bg=_INK, padx=2, pady=2)
+        self.frame.pack(padx=(0, 7), pady=(0, 7))
+        paper = tk.Frame(self.frame, bg=_PAPER)
+        paper.pack(fill="both", expand=True)
+        self.ribbon = tk.Frame(paper, bg=_STATE_COLORS["recording"], padx=11, pady=5)
+        self.ribbon.pack(fill="x")
+        self.state_label = tk.Label(
+            self.ribbon,
+            text="RECORDING",
+            bg=_STATE_COLORS["recording"],
+            fg=_INK,
+            font=("Segoe UI", 9, "bold"),
         )
-        self.label.pack(side="left")
+        self.state_label.pack(side="left")
+        self.activity_label = tk.Canvas(
+            self.ribbon,
+            width=20,
+            height=14,
+            bg=_STATE_COLORS["recording"],
+            highlightthickness=0,
+        )
+        self.activity_label.pack(side="right")
+        self.activity_label.create_rectangle(5, 4, 12, 11, fill=_INK, outline="")
+        message = tk.Frame(paper, bg=_PAPER, padx=12, pady=9)
+        message.pack(fill="x")
+        self.label = tk.Label(
+            message,
+            bg=_PAPER,
+            fg=_INK,
+            justify="left",
+            anchor="w",
+            wraplength=320,
+            font=("Segoe UI", 13, "bold"),
+        )
+        self.label.pack(fill="x", anchor="w")
+        self.hint_label = tk.Label(
+            message, bg=_PAPER, fg=_INK, anchor="w", font=("Segoe UI", 10)
+        )
+        self.hint_label.pack(fill="x", pady=(4, 0))
+        self.transcript_holder = tk.Frame(paper, bg=_INK, padx=2, pady=2)
         self.transcript = tk.Text(
-            self.frame,
-            width=48,
+            self.transcript_holder,
+            width=38,
             height=6,
             wrap="word",
             state="disabled",
             exportselection=False,
+            bg="#FFF8E6",
+            fg=_INK,
+            insertbackground=_INK,
+            selectbackground=_INK,
+            selectforeground="#FFFFFF",
+            relief="flat",
+            borderwidth=0,
+            font=("Segoe UI", 10),
         )
-        self.copy_button = tk.Button(self.frame, text="Copy", command=self._copy)
-        self.dismiss_button = tk.Button(self.frame, text="Dismiss", command=self.hide)
-        self.close_button = tk.Button(self.frame, text="Exit", command=on_close)
+        scrollbar = tk.Scrollbar(self.transcript_holder, command=self.transcript.yview)
+        self.transcript.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.transcript.pack(side="left", fill="both", expand=True)
+        separator = tk.Frame(paper, height=2, bg=_INK)
+        separator.pack(fill="x")
+        actions = tk.Frame(paper, bg=_PAPER, padx=10, pady=7)
+        actions.pack(fill="x")
+        button_style = {
+            "bg": _PAPER,
+            "fg": _INK,
+            "activebackground": "#F5CB5E",
+            "activeforeground": _INK,
+            "font": ("Segoe UI", 9, "bold"),
+            "relief": "solid",
+            "borderwidth": 2,
+            "highlightthickness": 2,
+            "highlightcolor": _INK,
+            "highlightbackground": _PAPER,
+            "padx": 7,
+            "pady": 3,
+            "takefocus": True,
+        }
+        self.copy_button = tk.Button(
+            actions, button_style, text="Copy", command=self._copy
+        )
+        self.dismiss_button = tk.Button(
+            actions, button_style, text="Dismiss", command=self.hide
+        )
+        self.close_button = tk.Button(
+            actions, button_style, text="Exit", command=on_close
+        )
         self.close_button.pack(side="right")
         self.text = None
 
@@ -50,23 +131,34 @@ class _TkOverlay:
 
     def present(self, state, text):
         self.text = text if state == "copy" else None
+        color = _STATE_COLORS.get(state, _STATE_COLORS["error"])
+        self.ribbon.config(bg=color)
+        self.state_label.config(
+            text={"copy": "RESULT"}.get(state, state.upper()), bg=color
+        )
+        self.activity_label.config(bg=color)
         self.label.config(
             text={
-                "recording": "Recording…  Win+Alt+S to stop",
+                "recording": "Recording…",
                 "transcribing": "Transcribing…",
                 "error": text or "Dictation failed.",
                 "copy": "Could not paste. Select or copy this result.",
             }.get(state, state)
         )
+        self.hint_label.config(text="Win+Alt+S to stop" if state == "recording" else "")
+        if state in {"recording", "transcribing"}:
+            self.activity_label.pack(side="right")
+        else:
+            self.activity_label.pack_forget()
         if state == "copy":
             self.transcript.config(state="normal")
             self.transcript.delete("1.0", "end")
             self.transcript.insert("1.0", text or "")
             self.transcript.config(state="disabled")
-            self.transcript.pack(side="bottom", fill="both", expand=True)
+            self.transcript_holder.pack(fill="both", expand=True, padx=12, pady=(0, 8))
             self.copy_button.pack(side="right")
         else:
-            self.transcript.pack_forget()
+            self.transcript_holder.pack_forget()
             self.copy_button.pack_forget()
         if state in {"copy", "error"}:
             self.dismiss_button.pack(side="right")
