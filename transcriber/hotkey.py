@@ -4,6 +4,10 @@ import ctypes
 import threading
 from ctypes import wintypes
 
+MOD_ALT = 0x0001
+MOD_WIN = 0x0008
+MOD_NOREPEAT = 0x4000
+
 
 class _Win32Hotkey:
     def __init__(self):
@@ -46,7 +50,9 @@ class HotkeyListener:
 
         def run():
             self.thread_id = self.api.thread_id()
-            self.registered = self.api.register(0x0008 | 0x0001, ord("S"))
+            self.registered = self.api.register(
+                MOD_WIN | MOD_ALT | MOD_NOREPEAT, ord("S")
+            )
             self.ready.set()
             if not self.registered:
                 return
