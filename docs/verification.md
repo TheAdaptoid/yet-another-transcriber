@@ -27,8 +27,9 @@ Do not record audio, transcripts, window titles, or clipboard content in results
   and reported that the input remained empty. Real background-noise checks
   remain unverified.
 - [ ] **Partially verified:** the user reported that a normal short sentence and
-  a separate short utterance appeared with their first and last words. Quiet
-  speech and other boundary cases remain unverified.
+  a separate short utterance appeared with their first and last words. The user
+  also reported that regular speech was detected at several volume levels.
+  Other quiet-speech and word-boundary cases remain unverified.
 - [ ] **Not verified:** music and speech-like background noise do not cause
   unwanted text insertion.
 - [ ] **Not verified:** disconnect networking after setup, restart, and dictate successfully.
