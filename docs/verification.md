@@ -6,7 +6,8 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 
 ## Gates
 
-- [ ] **Not verified:** build whisper.cpp v1.9.5 with MSVC, verify model and binary hashes, and launch with the resulting assets.
+- [x] **Verified:** build the pinned whisper.cpp v1.9.5 source with MSVC,
+  verify model and binary hashes, and launch with the resulting assets.
 - [ ] **Not verified:** dictate into OpenCode in Windows Terminal and verify caret insertion.
 - [ ] **Not verified:** dictate into Obsidian and verify caret insertion.
 - [ ] **Not verified:** confirm UI Automation element identity remains stable in both applications.
@@ -24,7 +25,17 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 - Win+Alt+S registration and unregistration: passed as an isolated Windows API check.
 - A second registration of Win+Alt+S while the first was held failed as expected.
 - A Tk error overlay was visible without changing the foreground window.
-- Setup was attempted but CMake was unavailable. The model and CLI were not installed or verified.
+- The pinned source built with MSVC and CMake. The CLI reports
+  `whisper.cpp version: 1.9.5-dev`; the checked-out v1.9.5 tag resolves to the
+  pinned source commit.
+- The model SHA-256 matched the pinned value, and startup asset validation
+  passed for the model, executable, and installed DLLs.
+- A direct CPU CLI invocation with synthetic silent audio exited successfully.
+  A real runtime instance started with verified assets and shut down cleanly.
+  Neither check verifies speech recognition quality or target-app insertion.
+- The recognizer returned a nonempty result for whisper.cpp's bundled JFK
+  sample in 1.3 seconds on this PC. This is not a user-microphone latency
+  measurement or a target-app verification.
 - Windows Terminal, Obsidian, OpenCode, and a default input device are present.
   Dictation was not attempted in existing user windows or documents; the
   target-app, microphone, and offline checks still require a controlled manual
