@@ -103,6 +103,21 @@ def test_silence_never_launches_cli(tmp_path):
     )
 
 
+def test_blank_audio_cli_result_is_not_a_transcript(tmp_path):
+    paths = Paths.for_home(tmp_path)
+    paths.cli.parent.mkdir(parents=True)
+    paths.cli.touch()
+
+    class Process:
+        returncode = 0
+
+        def communicate(self, timeout):
+            return ("\n[BLANK_AUDIO]\n", "")
+
+    recognizer = Recognizer(make_logger(paths.log), popen=lambda *a, **kw: Process())
+    assert recognizer.transcribe(np.array([1000], dtype=np.int16), paths, "a") == ""
+
+
 def test_recognition_logs_only_metrics_and_cleans_wave(tmp_path):
     paths = Paths.for_home(tmp_path)
     paths.cli.parent.mkdir(parents=True)

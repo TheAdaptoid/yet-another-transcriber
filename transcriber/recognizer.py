@@ -129,7 +129,8 @@ class Recognizer:
             )
             if process.returncode != 0:
                 raise RecognitionError("cli_failed")
-            return stdout.strip()
+            text = stdout.strip()
+            return "" if text == "[BLANK_AUDIO]" else text
         finally:
             if process is not None and not finished:
                 try:

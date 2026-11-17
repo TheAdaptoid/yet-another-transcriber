@@ -21,7 +21,10 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 - [ ] **Not verified:** indicator never takes foreground while recording, processing, or showing a fallback in either target app.
 - [ ] **Not verified:** hotkey conflict, microphone failure, missing or invalid model, and clipboard or paste failures show an error or copyable transcript.
 - [ ] **Not verified:** a 60-second recording stops exactly once; shortcuts during transcription do nothing.
-- [ ] **Not verified:** silent and realistically noisy no-speech recordings do not produce pasted words. The low-level PCM noise gate is not a voice activity detector.
+- [ ] **Failed; retest required:** a quiet microphone recording produced a
+  `[BLANK_AUDIO]` marker that was inserted into OpenCode. A separate synthetic
+  noise test also produced hallucinated words. The low-level PCM noise gate is
+  not a voice activity detector.
 - [ ] **Not verified:** disconnect networking after setup, restart, and dictate successfully.
 - [ ] **Not verified:** orphan audio is removed and log rotation preserves privacy.
 
