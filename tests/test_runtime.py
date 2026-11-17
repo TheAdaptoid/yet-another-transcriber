@@ -101,7 +101,9 @@ def test_indicator_only_uses_nonactivating_overlay():
     assert overlay.events[-1] == ("close",)
 
 
-def test_fallback_text_can_be_selected_and_copy_failure_is_visible(monkeypatch):
+def test_fallback_text_can_be_selected_and_copy_failure_is_visible(
+    monkeypatch, tk_master
+):
     from transcriber import indicator as module
 
     class FailingClipboard:
@@ -112,7 +114,7 @@ def test_fallback_text_can_be_selected_and_copy_failure_is_visible(monkeypatch):
             return False
 
     monkeypatch.setattr(module, "WindowsInsertion", FailingClipboard)
-    root = tk.Tk()
+    root = tk.Toplevel(tk_master)
     try:
         overlay = _TkOverlay(root, lambda: None)
         overlay.present("copy", "private words")
@@ -124,8 +126,8 @@ def test_fallback_text_can_be_selected_and_copy_failure_is_visible(monkeypatch):
         root.destroy()
 
 
-def test_dismissing_fallback_does_not_exit():
-    root = tk.Tk()
+def test_dismissing_fallback_does_not_exit(tk_master):
+    root = tk.Toplevel(tk_master)
     closed = []
     try:
         overlay = _TkOverlay(root, lambda: closed.append(True))

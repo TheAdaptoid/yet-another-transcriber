@@ -37,6 +37,10 @@ for behavior changes and bug fixes. For changes to audio, focus, insertion, or
 the indicator, record the manual tests. Record cases that you did not test in
 the pull request.
 
+Before changing visual UI, consult the [design references](docs/design/README.md).
+For indicator changes, compare the rendered Windows states against the
+[worked example](docs/design/indicator.md) as well as running automated tests.
+
 ## Preserve the safety boundaries
 
 - Keep recording and recognition local after setup. Do not add runtime model
