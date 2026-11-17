@@ -42,7 +42,9 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 - [ ] **Not verified:** disconnect networking after setup, restart, and dictate
   successfully. The user chose to defer this test; source inspection found
   network access in setup scripts, not in the application runtime code.
-- [ ] **Not verified:** orphan audio is removed and log rotation preserves privacy.
+- [x] **Verified in an isolated temporary directory:** owned orphan WAVs were
+  removed, unrelated WAVs remained, and five-file rotation stayed within
+  5 MiB per file. A private-field sentinel was rejected and absent from logs.
 
 ## Observations in this development environment
 
