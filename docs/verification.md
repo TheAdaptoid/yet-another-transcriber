@@ -1,8 +1,20 @@
 # Offline dictation verification
 
-The MVP is **not verified usable**. Execute the setup script first on Windows 11
-with CMake, MSVC, a microphone, Windows Terminal/OpenCode, and Obsidian.
-Do not record audio, transcripts, window titles, or clipboard content in results.
+The checks below document observations on one Windows 11 PC. Do not record audio,
+transcripts, window titles, or clipboard content in results.
+
+## Installed background app
+
+- The app was installed with `uv tool install` into an isolated tool directory.
+  From outside the checkout, `yat start` succeeded with the installed assets.
+- `yat doctor` reported valid assets and an available input device. It did not
+  probe the shortcut while the managed instance existed.
+- `yat stop` stopped the instance; a second stop reported it was not running.
+- The user reported that a spoken phrase appeared correctly through the
+  installed background app. The target application and submission state were
+  not recorded for this specific check.
+- Automated tests verified that a detached child with a fake runtime survived
+  its launcher's exit. Terminal closure with the real runtime remains unverified.
 
 ## Gates
 
