@@ -21,10 +21,11 @@ Do not record audio, transcripts, window titles, or clipboard content in results
 - [ ] **Not verified:** indicator never takes foreground while recording, processing, or showing a fallback in either target app.
 - [ ] **Not verified:** hotkey conflict, microphone failure, missing or invalid model, and clipboard or paste failures show an error or copyable transcript.
 - [ ] **Not verified:** a 60-second recording stops exactly once; shortcuts during transcription do nothing.
-- [ ] **Failed; retest required:** a quiet microphone recording produced a
-  `[BLANK_AUDIO]` marker that was inserted into OpenCode. A separate synthetic
-  noise test also produced hallucinated words. The low-level PCM noise gate is
-  not a voice activity detector.
+- [ ] **Partially verified:** before VAD, a quiet recording inserted a
+  `[BLANK_AUDIO]` marker and synthetic noise produced hallucinated words.
+  With Silero VAD, the user repeated a quiet five-second recording in OpenCode
+  and reported that the input remained empty. Real background-noise checks
+  remain unverified.
 - [ ] **Not verified:** quiet and normal speech, including short utterances and
   words at the start and end of recordings, survive VAD without clipping.
 - [ ] **Not verified:** music and speech-like background noise do not cause
