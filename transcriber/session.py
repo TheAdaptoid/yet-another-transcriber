@@ -4,7 +4,7 @@ import threading
 import time
 import uuid
 
-from transcriber.config import MAX_SECONDS, MODEL_NAME, SAMPLE_RATE
+from transcriber.config import MAX_SECONDS, SAMPLE_RATE
 from transcriber.diagnostics import log_event
 from transcriber.insertion import (
     ClipboardOutcome,
@@ -21,6 +21,10 @@ from transcriber.targets import (
     capture_target_result,
     check_focus,
 )
+
+
+def _focus_matches(outcome):
+    return outcome is True or outcome == TargetOutcome.MATCH
 
 
 class SessionController:
@@ -221,6 +225,37 @@ class SessionController:
         except Exception:
             return TargetOutcome.AUTOMATION_ERROR
 
+    def _log_final_focus(self, outcome):
+        if isinstance(outcome, TargetOutcome):
+            log_event(
+                self.logger,
+                self.session_id,
+                "focus_check",
+                outcome=outcome,
+                stage="final",
+            )
+
+    def _initial_focus(self, target):
+        started = self.clock()
+        try:
+            focus = (
+                self.focused(target)
+                if target is not None
+                else TargetOutcome.UNAVAILABLE
+            )
+        except Exception:
+            focus = TargetOutcome.AUTOMATION_ERROR
+        self._event("focus_check", started)
+        if isinstance(focus, TargetOutcome):
+            log_event(
+                self.logger,
+                self.session_id,
+                "focus_check",
+                outcome=focus,
+                stage="initial",
+            )
+        return focus
+
     def _log_paste_result(self, result):
         if not isinstance(result, PasteOutcome):
             return
@@ -261,30 +296,12 @@ class SessionController:
             self.session_id,
             "result",
             output_characters=len(text),
-            model=MODEL_NAME,
+            model=self.paths.model.name,
         )
         self.state = "inserting"
         target = self.target
-        started = self.clock()
-        try:
-            focus = (
-                self.focused(target)
-                if target is not None
-                else TargetOutcome.UNAVAILABLE
-            )
-            valid = focus is True or focus == TargetOutcome.MATCH
-        except Exception:
-            focus = TargetOutcome.AUTOMATION_ERROR
-            valid = False
-        self._event("focus_check", started)
-        if isinstance(focus, TargetOutcome):
-            log_event(
-                self.logger,
-                self.session_id,
-                "focus_check",
-                outcome=focus,
-                stage="initial",
-            )
+        focus = self._initial_focus(target)
+        valid = _focus_matches(focus)
         output = safe_text(text)
         success = False
         result = None
@@ -295,7 +312,7 @@ class SessionController:
             def guard():
                 nonlocal final_focus
                 final_focus = self._final_focus_guard(target)
-                return final_focus is True or final_focus == TargetOutcome.MATCH
+                return _focus_matches(final_focus)
 
             result = self.paste(
                 output,
@@ -307,14 +324,7 @@ class SessionController:
                     duration_ms=duration,
                 ),
             )
-            if isinstance(final_focus, TargetOutcome):
-                log_event(
-                    self.logger,
-                    self.session_id,
-                    "focus_check",
-                    outcome=final_focus,
-                    stage="final",
-                )
+            self._log_final_focus(final_focus)
             success = result is True or result == PasteOutcome.INPUT_SUBMITTED
             self._log_paste_result(result)
             self._event("paste", started)

@@ -6,7 +6,7 @@ import re
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from transcriber.config import MODEL_NAME
+from transcriber.config import MODEL_FILES
 
 _NUMERIC_FIELDS = {
     "duration_ms",
@@ -14,7 +14,7 @@ _NUMERIC_FIELDS = {
     "output_characters",
 }
 _STRING_VALUES = {
-    "model": {MODEL_NAME},
+    "model": set(MODEL_FILES.values()),
     "stage": {"initial", "final"},
     "outcome": {
         "match",

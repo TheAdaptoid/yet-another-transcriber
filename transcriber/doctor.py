@@ -51,7 +51,10 @@ def run_checks() -> list[tuple[str, bool | None, str]]:
     python_ok = sys.version_info[:2] == (3, 13)
     checks.append(("python", python_ok, "Python 3.13 is required."))
     home = os.environ.get("USERPROFILE")
-    assets_ok = bool(home) and check_assets(Paths.for_home(Path(home)))
+    try:
+        assets_ok = bool(home) and check_assets(Paths.for_home(Path(home)))
+    except (OSError, ValueError, UnicodeError):
+        assets_ok = False
     checks.append(
         ("assets", assets_ok, "Assets valid." if assets_ok else "Run the asset setup.")
     )

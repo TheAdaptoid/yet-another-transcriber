@@ -18,6 +18,7 @@ from transcriber.recognizer import Recognizer
 from transcriber.session import SessionController
 
 MODEL_SHA256 = "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002"
+SMALL_MODEL_SHA256 = "c6138d6d58ecc8322097e0f987c32f1be8bb0a18532a3f88f734d1bbf9c41e5d"
 SOURCE_COMMIT = "d1be6fde11ac6e0407606b4e42fe72d34add8037"
 
 
@@ -46,11 +47,17 @@ def check_assets(paths: Paths) -> bool:
             for name, digest in dlls.items()
         ):
             return False
+        model_hashes = {
+            "ggml-base.en.bin": MODEL_SHA256,
+            "ggml-small.en.bin": SMALL_MODEL_SHA256,
+        }
+        expected_model = model_hashes.get(paths.model.name)
         return (
             manifest["version"] == "v1.9.5"
             and manifest["source_commit"] == SOURCE_COMMIT
             and manifest["model_sha256"] == MODEL_SHA256
-            and _sha256(paths.model) == MODEL_SHA256
+            and expected_model is not None
+            and _sha256(paths.model) == expected_model
             and manifest["vad_sha256"] == VAD_SHA256
             and _sha256(paths.vad_model) == VAD_SHA256
             and _sha256(paths.cli) == manifest["cli_sha256"]
@@ -161,8 +168,13 @@ def run_managed(app, loop, signals, report) -> int:
 
 def main(signals=None, report=None) -> int:
     """Start the background app without fetching assets."""
+    try:
+        paths = Paths.for_home(Path(os.environ["USERPROFILE"]))
+    except (KeyError, OSError, ValueError, UnicodeError):
+        if report is not None:
+            report("error:assets_or_hotkey")
+        return 1
     root = tk.Tk()
-    paths = Paths.for_home(Path(os.environ["USERPROFILE"]))
     app = None
 
     def shutdown():
