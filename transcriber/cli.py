@@ -1,5 +1,10 @@
 """Command-line interface for Yet Another Transcriber."""
 
+import json
+import os
+import tempfile
+from pathlib import Path
+
 import typer
 from rich.console import Console
 
@@ -9,6 +14,50 @@ microphone_app = typer.Typer(no_args_is_help=True)
 app.add_typer(
     microphone_app, name="microphone", help="List or select input microphones."
 )
+model_app = typer.Typer(no_args_is_help=True)
+app.add_typer(model_app, name="model", help="View or select the speech model.")
+
+
+@model_app.command("list")
+def model_list() -> None:
+    """Show supported models and the selected model."""
+    from transcriber.config import MODEL_FILES, Paths
+
+    try:
+        home = Path(os.environ["USERPROFILE"])
+        selected = Paths.for_home(home).model.name
+        for name, filename in MODEL_FILES.items():
+            console.print(f"{name}{' (selected)' if filename == selected else ''}")
+    except (KeyError, OSError, ValueError) as exc:
+        console.print(f"Cannot read model selection: {exc}")
+        raise typer.Exit(code=1) from exc
+
+
+@model_app.command("select")
+def model_select(name: str) -> None:
+    """Select base.en or small.en for the next start."""
+    from transcriber.config import MODEL_FILES
+
+    if name not in MODEL_FILES:
+        console.print("Choose base.en or small.en.")
+        raise typer.Exit(code=1)
+    tmp = None
+    try:
+        root = Path(os.environ["USERPROFILE"]) / ".yat"
+        root.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=root, delete=False
+        ) as file:
+            tmp = Path(file.name)
+            json.dump({"model": name}, file)
+        os.replace(tmp, root / "model.json")
+    except (KeyError, OSError) as exc:
+        console.print("Cannot save model selection; check profile permissions.")
+        raise typer.Exit(code=1) from exc
+    finally:
+        if tmp is not None:
+            tmp.unlink(missing_ok=True)
+    console.print(f"Selected {name}. Restart YAT for the change to take effect.")
 
 
 @microphone_app.command("list")
