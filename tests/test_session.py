@@ -120,6 +120,42 @@ def test_focus_logs_identify_each_verification_stage(tmp_path):
     }
 
 
+def test_final_focus_logging_occurs_after_input_submission(tmp_path, monkeypatch):
+    from transcriber import session
+    from transcriber.insertion import paste_text_result
+    from transcriber.targets import TargetOutcome
+
+    ctl, _, _, _, _, work, ui, _, _, _ = setup_controller(tmp_path)
+    current_target = ["original"]
+    sent_to = []
+    events = []
+    original_log = session.log_event
+
+    def log(logger, session_id, event, **fields):
+        if event == "focus_check" and fields.get("stage") == "final":
+            events.append("final_log")
+            current_target[0] = "other"
+        original_log(logger, session_id, event, **fields)
+
+    class Windows:
+        def set_clipboard(self, text):
+            return True
+
+        def send_keys(self, keys):
+            events.append("send")
+            sent_to.append(current_target[0])
+            return True
+
+    monkeypatch.setattr(session, "log_event", log)
+    ctl.focused = lambda target: TargetOutcome.MATCH
+    ctl.paste = lambda text, **kwargs: paste_text_result(text, api=Windows(), **kwargs)
+    ctl.on_hotkey()
+    ctl.on_hotkey()
+    finish_work(work, ui)
+    assert sent_to == ["original"]
+    assert events == ["send", "final_log"]
+
+
 def test_cancel_recording_discards_audio_and_invalidates_queued_callbacks(tmp_path):
     ctl, rec, _, states, timers, work, ui, pastes, copies, _ = setup_controller(
         tmp_path

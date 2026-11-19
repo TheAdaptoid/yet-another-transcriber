@@ -217,19 +217,9 @@ class SessionController:
 
     def _final_focus_guard(self, target):
         try:
-            checked = self.focused(target)
+            return self.focused(target)
         except Exception:
-            checked = TargetOutcome.AUTOMATION_ERROR
-        if isinstance(checked, TargetOutcome):
-            log_event(
-                self.logger,
-                self.session_id,
-                "focus_check",
-                outcome=checked,
-                stage="final",
-            )
-            return checked == TargetOutcome.MATCH
-        return checked is True
+            return TargetOutcome.AUTOMATION_ERROR
 
     def _log_paste_result(self, result):
         if not isinstance(result, PasteOutcome):
@@ -300,10 +290,16 @@ class SessionController:
         result = None
         if valid and target is not None and output:
             started = self.clock()
+            final_focus = None
+
+            def guard():
+                nonlocal final_focus
+                final_focus = self._final_focus_guard(target)
+                return final_focus is True or final_focus == TargetOutcome.MATCH
 
             result = self.paste(
                 output,
-                guard=lambda: self._final_focus_guard(target),
+                guard=guard,
                 on_clipboard=lambda duration: log_event(
                     self.logger,
                     self.session_id,
@@ -311,6 +307,14 @@ class SessionController:
                     duration_ms=duration,
                 ),
             )
+            if isinstance(final_focus, TargetOutcome):
+                log_event(
+                    self.logger,
+                    self.session_id,
+                    "focus_check",
+                    outcome=final_focus,
+                    stage="final",
+                )
             success = result is True or result == PasteOutcome.INPUT_SUBMITTED
             self._log_paste_result(result)
             self._event("paste", started)
