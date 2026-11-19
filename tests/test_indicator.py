@@ -112,6 +112,13 @@ def test_copy_result_is_complete_selectable_and_reports_clipboard_outcomes(
     assert overlay.transcript.get("1.0", "end-1c") == result
 
 
+def test_failed_automatic_copy_keeps_result_selectable(overlay):
+    overlay.present("copy_failed", "example")
+    assert overlay.label.cget("text") == "Copy failed. Select the text and try again."
+    assert overlay.transcript.get("1.0", "end-1c") == "example"
+    assert overlay.copy_button.winfo_manager()
+
+
 def _assert_within(root, area):
     root.update_idletasks()
     match = re.match(r"(\d+)x(\d+)\+(\d+)\+(\d+)", root.winfo_geometry())

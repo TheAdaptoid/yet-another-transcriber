@@ -325,3 +325,19 @@ def test_managed_runtime_reports_start_failure_without_mainloop():
     result = runtime.run_managed(App(), FakeLoop(), object(), calls.append)
     assert result == 1
     assert calls == ["error:assets_or_hotkey", "shutdown"]
+
+
+def test_managed_runtime_reports_specific_start_failure():
+    calls = []
+
+    class App:
+        start_error = "hotkey"
+
+        def start(self):
+            return False
+
+        def shutdown(self):
+            pass
+
+    assert runtime.run_managed(App(), FakeLoop(), object(), calls.append) == 1
+    assert calls == ["error:hotkey"]

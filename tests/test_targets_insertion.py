@@ -3,6 +3,24 @@ from types import SimpleNamespace
 from transcriber import insertion, targets
 
 
+def test_capture_reports_automation_error_without_exposing_exception(monkeypatch):
+    monkeypatch.setattr(targets, "_foreground", lambda: 123)
+    monkeypatch.setattr(
+        targets, "_focused_runtime_id", lambda: (_ for _ in ()).throw(OSError("secret"))
+    )
+    result = targets.capture_target_result()
+    assert result.outcome == targets.TargetOutcome.AUTOMATION_ERROR
+    assert result.target is None
+
+
+def test_focus_result_distinguishes_changed_target(monkeypatch):
+    monkeypatch.setattr(targets, "_foreground", lambda: 123)
+    monkeypatch.setattr(targets, "_focused_runtime_id", lambda: (1, 3))
+    assert targets.check_focus(targets.TargetSnapshot(123, (1, 2))) == (
+        targets.TargetOutcome.CHANGED
+    )
+
+
 def test_target_requires_window_and_identity(monkeypatch):
     monkeypatch.setattr(targets, "_foreground", lambda: 123)
     monkeypatch.setattr(targets, "_focused_runtime_id", lambda: (1, 2))
@@ -76,6 +94,27 @@ class FakeWindows:
     def send_keys(self, keys):
         self.keys.extend(keys)
         return self.send_result
+
+
+def test_paste_result_distinguishes_clipboard_guard_and_input_failure():
+    win = FakeWindows()
+    assert insertion.paste_text_result("x", guard=lambda: False, api=win) == (
+        insertion.PasteOutcome.FOCUS_REJECTED
+    )
+    win.send_result = False
+    assert insertion.paste_text_result("x", guard=lambda: True, api=win) == (
+        insertion.PasteOutcome.INPUT_REJECTED
+    )
+    win.set_clipboard = lambda text: False
+    assert insertion.paste_text_result("x", guard=lambda: True, api=win) == (
+        insertion.PasteOutcome.CLIPBOARD_FAILED
+    )
+
+
+def test_clipboard_result_reports_failure_without_exception_text():
+    win = FakeWindows()
+    win.set_clipboard = lambda text: (_ for _ in ()).throw(OSError("secret"))
+    assert insertion.copy_text_result("x", api=win) == insertion.ClipboardOutcome.FAILED
 
 
 def test_paste_only_sends_ctrl_v_and_keeps_unicode_clipboard():

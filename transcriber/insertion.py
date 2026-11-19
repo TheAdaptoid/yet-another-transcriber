@@ -5,9 +5,27 @@ import re
 import time
 import unicodedata
 from ctypes import wintypes
+from enum import StrEnum
 from typing import Callable
 
 _ANSI = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\)|[@-_])")
+
+
+class PasteOutcome(StrEnum):
+    """Bounded outcomes of guarded input submission."""
+
+    INPUT_SUBMITTED = "input_submitted"
+    CLIPBOARD_FAILED = "clipboard_failed"
+    FOCUS_REJECTED = "focus_rejected"
+    INPUT_REJECTED = "input_rejected"
+    UNKNOWN = "unknown"
+
+
+class ClipboardOutcome(StrEnum):
+    """Bounded outcome of a clipboard write."""
+
+    COPIED = "copy_succeeded"
+    FAILED = "copy_failed"
 
 
 def safe_text(text: str) -> str:
@@ -119,6 +137,43 @@ class WindowsInsertion:
         return send(len(values), values, ctypes.sizeof(_Input)) == len(values)
 
 
+def copy_text_result(text: str, *, api: WindowsInsertion) -> ClipboardOutcome:
+    """Write text to the clipboard without exposing exception details."""
+    try:
+        return (
+            ClipboardOutcome.COPIED
+            if api.set_clipboard(text)
+            else ClipboardOutcome.FAILED
+        )
+    except Exception:
+        return ClipboardOutcome.FAILED
+
+
+def paste_text_result(
+    text: str,
+    *,
+    guard: Callable[[], bool] | None = None,
+    api: WindowsInsertion | None = None,
+    on_clipboard: Callable[[float], None] | None = None,
+) -> PasteOutcome:
+    """Put text on clipboard and paste only after a successful focus guard."""
+    win = api or WindowsInsertion()
+    try:
+        started = time.monotonic()
+        copied = copy_text_result(text, api=win)
+        if on_clipboard:
+            on_clipboard((time.monotonic() - started) * 1000)
+        if copied != ClipboardOutcome.COPIED:
+            return PasteOutcome.CLIPBOARD_FAILED
+        if guard is None or not guard():
+            return PasteOutcome.FOCUS_REJECTED
+        if win.send_keys([(0x11, False), (0x56, False), (0x56, True), (0x11, True)]):
+            return PasteOutcome.INPUT_SUBMITTED
+        return PasteOutcome.INPUT_REJECTED
+    except Exception:
+        return PasteOutcome.UNKNOWN
+
+
 def paste_text(
     text: str,
     *,
@@ -126,17 +181,8 @@ def paste_text(
     api: WindowsInsertion | None = None,
     on_clipboard: Callable[[float], None] | None = None,
 ) -> bool:
-    """Put text on clipboard and paste only after a successful focus guard."""
-    win = api or WindowsInsertion()
-    try:
-        started = time.monotonic()
-        copied = win.set_clipboard(text)
-        if on_clipboard:
-            on_clipboard((time.monotonic() - started) * 1000)
-        if not copied:
-            return False
-        if guard is None or not guard():
-            return False
-        return win.send_keys([(0x11, False), (0x56, False), (0x56, True), (0x11, True)])
-    except Exception:
-        return False
+    """Compatibility wrapper for the guarded paste operation."""
+    return (
+        paste_text_result(text, guard=guard, api=api, on_clipboard=on_clipboard)
+        == PasteOutcome.INPUT_SUBMITTED
+    )

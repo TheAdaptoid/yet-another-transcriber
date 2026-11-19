@@ -3,6 +3,16 @@
 import ctypes
 from ctypes import wintypes
 from dataclasses import dataclass
+from enum import StrEnum
+
+
+class TargetOutcome(StrEnum):
+    """Bounded results of capturing or comparing a target."""
+
+    MATCH = "match"
+    UNAVAILABLE = "unavailable"
+    CHANGED = "changed"
+    AUTOMATION_ERROR = "automation_error"
 
 
 @dataclass(frozen=True)
@@ -11,6 +21,14 @@ class TargetSnapshot:
 
     hwnd: int
     runtime_id: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class TargetResult:
+    """A capture outcome and its target when available."""
+
+    outcome: TargetOutcome
+    target: TargetSnapshot | None = None
 
 
 def _foreground() -> int:
@@ -32,20 +50,35 @@ def _focused_runtime_id() -> tuple[int, ...]:
     return tuple(int(value) for value in element.GetRuntimeId())
 
 
-def capture_target() -> TargetSnapshot | None:
-    """Return a complete supported target or fail closed."""
+def capture_target_result() -> TargetResult:
+    """Capture a complete target, preserving a safe failure category."""
     try:
         hwnd = _foreground()
         if not hwnd:
-            return None
+            return TargetResult(TargetOutcome.UNAVAILABLE)
         runtime_id = _focused_runtime_id()
-        if not runtime_id or _foreground() != hwnd:
-            return None
-        return TargetSnapshot(hwnd, runtime_id)
+        if not runtime_id:
+            return TargetResult(TargetOutcome.UNAVAILABLE)
+        if _foreground() != hwnd:
+            return TargetResult(TargetOutcome.CHANGED)
+        return TargetResult(TargetOutcome.MATCH, TargetSnapshot(hwnd, runtime_id))
     except Exception:
-        return None
+        return TargetResult(TargetOutcome.AUTOMATION_ERROR)
+
+
+def capture_target() -> TargetSnapshot | None:
+    """Return a complete supported target or fail closed."""
+    return capture_target_result().target
+
+
+def check_focus(target: TargetSnapshot) -> TargetOutcome:
+    """Compare the current target with the original snapshot."""
+    result = capture_target_result()
+    if result.outcome != TargetOutcome.MATCH:
+        return result.outcome
+    return TargetOutcome.MATCH if result.target == target else TargetOutcome.CHANGED
 
 
 def still_focused(target: TargetSnapshot) -> bool:
     """Require both original window and focused element to match."""
-    return capture_target() == target
+    return check_focus(target) == TargetOutcome.MATCH
