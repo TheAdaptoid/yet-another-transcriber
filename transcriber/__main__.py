@@ -13,7 +13,7 @@ from transcriber.config import VAD_SHA256, Paths
 from transcriber.diagnostics import make_logger
 from transcriber.hotkey import HotkeyListener
 from transcriber.indicator import Indicator
-from transcriber.insertion import WindowsInsertion, paste_text
+from transcriber.insertion import WindowsInsertion, copy_text_result, paste_text_result
 from transcriber.recognizer import Recognizer
 from transcriber.session import SessionController
 
@@ -82,12 +82,14 @@ class Runtime:
         self.queue = queue.Queue()
         self.controller = None
         self.closed = False
+        self.start_error = "assets_or_hotkey"
 
     def start(self):
         """Check assets, remove orphan audio, and register the shortcut."""
         cleanup_temp_wavs(self.paths.tmp)
         logger = make_logger(self.paths.log)
         if not self.assets_ok(self.paths):
+            self.start_error = "assets"
             self.indicator.show(
                 "error", "Local model or speech engine missing or invalid. Run setup."
             )
@@ -105,8 +107,8 @@ class Runtime:
             schedule=lambda seconds, fn: self.loop.after(int(seconds * 1000), fn),
             worker=lambda fn: threading.Thread(target=fn, daemon=True).start(),
             post=self.queue.put,
-            copy=lambda text: insertion_api().set_clipboard(text),
-            paste=lambda text, **kwargs: paste_text(
+            copy=lambda text: copy_text_result(text, api=insertion_api()),
+            paste=lambda text, **kwargs: paste_text_result(
                 text, api=insertion_api(), **kwargs
             ),
         )
@@ -114,6 +116,7 @@ class Runtime:
         try:
             self.listener.start(lambda: controller.enqueue_hotkey(self.queue.put))
         except Exception:
+            self.start_error = "hotkey"
             self.indicator.show("error", "Win+Alt+S could not be registered.")
             return False
         self.loop.after(50, self.drain)
@@ -146,7 +149,7 @@ def run_managed(app, loop, signals, report) -> int:
     """Run the app with readiness reporting and loop-thread shutdown."""
     try:
         if not app.start():
-            report("error:assets_or_hotkey")
+            report("error:" + getattr(app, "start_error", "assets_or_hotkey"))
             return 1
 
         def check_stop():

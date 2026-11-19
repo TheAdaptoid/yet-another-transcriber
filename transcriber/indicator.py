@@ -163,6 +163,16 @@ class _TkOverlay:
         return user32.GetParent(self.root.winfo_id()) or self.root.winfo_id()
 
     def present(self, state, text):
+        copy_message = {
+            "copy_failed": "Copy failed. Select the text and try again.",
+            "copy_clipboard": "Clipboard unavailable. Select or copy this result.",
+            "copy_focus": ("Focus could not be confirmed. Select or copy this result."),
+            "copy_input": (
+                "Paste shortcut could not be sent. Select or copy this result."
+            ),
+        }.get(state)
+        if copy_message:
+            state = "copy"
         self._stop_animation()
         self.state = state
         self.error_text = text if state == "error" else None
@@ -178,7 +188,7 @@ class _TkOverlay:
                 "recording": "Recording…",
                 "transcribing": "Transcribing…",
                 "error": text or "Dictation failed.",
-                "copy": "Could not paste. Select or copy this result.",
+                "copy": copy_message or "Could not paste. Select or copy this result.",
             }.get(state, state)
         )
         self.hint_label.config(text="Win+Alt+S to stop" if state == "recording" else "")

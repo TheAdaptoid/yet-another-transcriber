@@ -6,10 +6,25 @@ import uuid
 
 from transcriber.config import MAX_SECONDS, SAMPLE_RATE
 from transcriber.diagnostics import log_event
-from transcriber.insertion import WindowsInsertion, paste_text, safe_text
+from transcriber.insertion import (
+    ClipboardOutcome,
+    PasteOutcome,
+    WindowsInsertion,
+    paste_text_result,
+    safe_text,
+)
 from transcriber.microphones import MicrophoneError
 from transcriber.recognizer import Cancellation
-from transcriber.targets import capture_target, still_focused
+from transcriber.targets import (
+    TargetOutcome,
+    TargetResult,
+    capture_target_result,
+    check_focus,
+)
+
+
+def _focus_matches(outcome):
+    return outcome is True or outcome == TargetOutcome.MATCH
 
 
 class SessionController:
@@ -26,9 +41,9 @@ class SessionController:
         schedule,
         worker,
         post,
-        capture=capture_target,
-        focused=still_focused,
-        paste=paste_text,
+        capture=capture_target_result,
+        focused=check_focus,
+        paste=paste_text_result,
         copy=None,
         clock=time.monotonic,
     ):
@@ -94,7 +109,14 @@ class SessionController:
         generation = self.generation
         self.session_id = uuid.uuid4().hex
         try:
-            self.target = self.capture()
+            captured = self.capture()
+            if isinstance(captured, TargetResult):
+                self.target = captured.target
+                log_event(
+                    self.logger, self.session_id, "target", outcome=captured.outcome
+                )
+            else:
+                self.target = captured
             started = self.clock()
             self.recorder.start()
             self._event("mic_open", started)
@@ -197,6 +219,59 @@ class SessionController:
                 return
         self.show_state("idle", None)
 
+    def _final_focus_guard(self, target):
+        try:
+            return self.focused(target)
+        except Exception:
+            return TargetOutcome.AUTOMATION_ERROR
+
+    def _log_final_focus(self, outcome):
+        if isinstance(outcome, TargetOutcome):
+            log_event(
+                self.logger,
+                self.session_id,
+                "focus_check",
+                outcome=outcome,
+                stage="final",
+            )
+
+    def _initial_focus(self, target):
+        started = self.clock()
+        try:
+            focus = (
+                self.focused(target)
+                if target is not None
+                else TargetOutcome.UNAVAILABLE
+            )
+        except Exception:
+            focus = TargetOutcome.AUTOMATION_ERROR
+        self._event("focus_check", started)
+        if isinstance(focus, TargetOutcome):
+            log_event(
+                self.logger,
+                self.session_id,
+                "focus_check",
+                outcome=focus,
+                stage="initial",
+            )
+        return focus
+
+    def _log_paste_result(self, result):
+        if not isinstance(result, PasteOutcome):
+            return
+        log_event(self.logger, self.session_id, "paste", outcome=result)
+        if result != PasteOutcome.UNKNOWN:
+            log_event(
+                self.logger,
+                self.session_id,
+                "clipboard_write",
+                outcome=(
+                    "clipboard_failed"
+                    if result == PasteOutcome.CLIPBOARD_FAILED
+                    else "clipboard_succeeded"
+                ),
+            )
+
     def on_transcription_done(self, text: str | None, error: str | None):
         """Handle recognition completion on the UI thread."""
         if self.closed or self.state != "transcribing":
@@ -204,7 +279,13 @@ class SessionController:
         if error is not None:
             self.state = "idle"
             log_event(self.logger, self.session_id, "error", error_category=error)
-            self.show_state("error", "Transcription failed.")
+            message = {
+                "cli_timeout": "Transcription timed out. Try a shorter recording.",
+                "cli_missing": "Speech engine unavailable. Run setup.",
+                "model": "Speech model unavailable or invalid. Run setup.",
+                "cli_failed": "Speech engine failed. Check local assets and run setup.",
+            }.get(error, "Transcription failed.")
+            self.show_state("error", message)
             return
         if not text or not text.strip():
             self.state = "idle"
@@ -219,19 +300,23 @@ class SessionController:
         )
         self.state = "inserting"
         target = self.target
-        started = self.clock()
-        try:
-            valid = target is not None and self.focused(target)
-        except Exception:
-            valid = False
-        self._event("focus_check", started)
+        focus = self._initial_focus(target)
+        valid = _focus_matches(focus)
         output = safe_text(text)
         success = False
+        result = None
         if valid and target is not None and output:
             started = self.clock()
-            success = self.paste(
+            final_focus = None
+
+            def guard():
+                nonlocal final_focus
+                final_focus = self._final_focus_guard(target)
+                return _focus_matches(final_focus)
+
+            result = self.paste(
                 output,
-                guard=lambda: self.focused(target),
+                guard=guard,
                 on_clipboard=lambda duration: log_event(
                     self.logger,
                     self.session_id,
@@ -239,18 +324,40 @@ class SessionController:
                     duration_ms=duration,
                 ),
             )
+            self._log_final_focus(final_focus)
+            success = result is True or result == PasteOutcome.INPUT_SUBMITTED
+            self._log_paste_result(result)
             self._event("paste", started)
         if success:
-            self._event("stop_to_insertion", self.stop_time)
+            self._event("stop_to_input_submission", self.stop_time)
             self.state = "idle"
             self.show_state("idle", None)
         else:
             try:
-                self.copy(output)
+                copy_result = self.copy(output)
+                copied = copy_result is True or copy_result == ClipboardOutcome.COPIED
             except Exception:
-                pass
+                copied = False
+            log_event(
+                self.logger,
+                self.session_id,
+                "fallback",
+                outcome="copy_succeeded" if copied else "copy_failed",
+            )
             self.state = "idle"
-            self.show_state("copy", output)
+            copy_state = {
+                PasteOutcome.CLIPBOARD_FAILED: "copy_clipboard",
+                PasteOutcome.FOCUS_REJECTED: "copy_focus",
+                PasteOutcome.INPUT_REJECTED: "copy_input",
+            }.get(
+                result,
+                "copy_focus"
+                if isinstance(focus, TargetOutcome) and not valid
+                else "copy",
+            )
+            if not copied:
+                copy_state = "copy_failed"
+            self.show_state(copy_state, output)
 
     def close(self):
         """Stop recording and discard any late completion on shutdown."""

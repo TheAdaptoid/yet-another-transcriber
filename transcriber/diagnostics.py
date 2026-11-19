@@ -15,6 +15,21 @@ _NUMERIC_FIELDS = {
 }
 _STRING_VALUES = {
     "model": set(MODEL_FILES.values()),
+    "stage": {"initial", "final"},
+    "outcome": {
+        "match",
+        "unavailable",
+        "changed",
+        "automation_error",
+        "input_submitted",
+        "clipboard_failed",
+        "clipboard_succeeded",
+        "focus_rejected",
+        "input_rejected",
+        "unknown",
+        "copy_succeeded",
+        "copy_failed",
+    },
     "error_category": {
         "microphone",
         "model",
@@ -40,9 +55,11 @@ _EVENTS = {
     "clipboard_write",
     "paste",
     "stop_to_insertion",
+    "stop_to_input_submission",
     "error",
     "result",
     "target",
+    "fallback",
 }
 
 

@@ -184,6 +184,13 @@ def start_service() -> tuple[bool, str]:
         return False, "Dictation is already running."
     if result == "error:assets_or_hotkey":
         return False, "Startup failed: check local assets and the hotkey."
+    if result == "error:assets":
+        return False, "Startup failed: local assets are missing or invalid. Run setup."
+    if result == "error:hotkey":
+        return (
+            False,
+            "Startup failed: Win+Alt+S is unavailable; check for a shortcut conflict.",
+        )
     return False, "Background process failed before reporting readiness."
 
 

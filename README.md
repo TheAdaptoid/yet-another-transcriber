@@ -158,7 +158,9 @@ Uninstalling the tool does not remove the separate assets and logs under
   The app removes that file after use and cleans up orphan WAVs on the next
   launch.
 - The app stores local diagnostic logs under `%USERPROFILE%\.yat\logs`. The logs
-  have stage timings and error categories. They do not have audio or transcript text.
+  have stage timings and allowlisted outcome codes for focus, clipboard, and
+  input submission. They do not have audio, transcript text, or window identities.
+  Input submission does not confirm that the target application pasted the text.
 - The app replaces the Windows clipboard with the result and does not restore
   its previous contents. Review fallback text before manually pasting it into
   a terminal.

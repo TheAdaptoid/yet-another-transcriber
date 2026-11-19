@@ -16,6 +16,7 @@ STAGES = {
     "clipboard_write",
     "paste",
     "stop_to_insertion",
+    "stop_to_input_submission",
 }
 
 

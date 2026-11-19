@@ -77,6 +77,85 @@ def finish_work(work, ui):
     ui.pop(0)()
 
 
+def test_failed_paste_and_fallback_are_logged_without_transcript(tmp_path):
+    from transcriber.insertion import PasteOutcome
+
+    ctl, _, _, states, _, work, ui, _, _, paths = setup_controller(tmp_path)
+    ctl.paste = lambda text, **kwargs: PasteOutcome.CLIPBOARD_FAILED
+    ctl.copy = lambda text: False
+    ctl.on_hotkey()
+    ctl.on_hotkey()
+    finish_work(work, ui)
+    records = [json.loads(line) for line in paths.log.read_text().splitlines()]
+    assert any(r.get("outcome") == "clipboard_failed" for r in records)
+    assert any(
+        r["event"] == "clipboard_write" and r.get("outcome") == "clipboard_failed"
+        for r in records
+    )
+    assert any(r.get("outcome") == "copy_failed" for r in records)
+    assert states[-1][0] == "copy_failed"
+    assert "private words" not in paths.log.read_text()
+
+
+def test_recognition_timeout_shows_actionable_message(tmp_path):
+    ctl, _, _, states, _, _, _, _, _, _ = setup_controller(tmp_path)
+    ctl.state = "transcribing"
+    ctl.session_id = "test"
+    ctl.on_transcription_done(None, "cli_timeout")
+    assert states[-1] == ("error", "Transcription timed out. Try a shorter recording.")
+
+
+def test_focus_logs_identify_each_verification_stage(tmp_path):
+    from transcriber.targets import TargetOutcome
+
+    ctl, _, _, _, _, work, ui, _, _, paths = setup_controller(tmp_path)
+    ctl.focused = lambda target: TargetOutcome.MATCH
+    ctl.on_hotkey()
+    ctl.on_hotkey()
+    finish_work(work, ui)
+    records = [json.loads(line) for line in paths.log.read_text().splitlines()]
+    assert {r.get("stage") for r in records if r["event"] == "focus_check"} >= {
+        "initial",
+        "final",
+    }
+
+
+def test_final_focus_logging_occurs_after_input_submission(tmp_path, monkeypatch):
+    from transcriber import session
+    from transcriber.insertion import paste_text_result
+    from transcriber.targets import TargetOutcome
+
+    ctl, _, _, _, _, work, ui, _, _, _ = setup_controller(tmp_path)
+    current_target = ["original"]
+    sent_to = []
+    events = []
+    original_log = session.log_event
+
+    def log(logger, session_id, event, **fields):
+        if event == "focus_check" and fields.get("stage") == "final":
+            events.append("final_log")
+            current_target[0] = "other"
+        original_log(logger, session_id, event, **fields)
+
+    class Windows:
+        def set_clipboard(self, text):
+            return True
+
+        def send_keys(self, keys):
+            events.append("send")
+            sent_to.append(current_target[0])
+            return True
+
+    monkeypatch.setattr(session, "log_event", log)
+    ctl.focused = lambda target: TargetOutcome.MATCH
+    ctl.paste = lambda text, **kwargs: paste_text_result(text, api=Windows(), **kwargs)
+    ctl.on_hotkey()
+    ctl.on_hotkey()
+    finish_work(work, ui)
+    assert sent_to == ["original"]
+    assert events == ["send", "final_log"]
+
+
 def test_cancel_recording_discards_audio_and_invalidates_queued_callbacks(tmp_path):
     ctl, rec, _, states, timers, work, ui, pastes, copies, _ = setup_controller(
         tmp_path
@@ -148,7 +227,7 @@ def test_session_transitions_timings_busy_and_one_id(tmp_path):
         "focus_check",
         "clipboard_write",
         "paste",
-        "stop_to_insertion",
+        "stop_to_input_submission",
     }
     assert any(
         event.get("output_characters") == len("private words") for event in events
@@ -180,7 +259,7 @@ def test_missing_or_changed_focus_is_copyable_without_paste(tmp_path):
     finish_work(work, ui)
     assert pastes == []
     assert copies == ["private words"]
-    assert states[-1] == ("copy", "private words")
+    assert states[-1] == ("copy_focus", "private words")
     ctl.capture = lambda: TargetSnapshot(42, (1,))
     ctl.focused = lambda target: False
     ctl.on_hotkey()
@@ -217,7 +296,10 @@ def test_fallback_copy_and_display_use_sanitized_text(tmp_path, failure):
 
     assert pastes == (["first second third"] if failure == "failed_paste" else [])
     assert copies == ["first second third"]
-    assert states[-1] == ("copy", "first second third")
+    assert states[-1] == (
+        "copy_focus" if failure == "missing_target" else "copy",
+        "first second third",
+    )
 
 
 def test_silence_and_error_never_paste(tmp_path):
