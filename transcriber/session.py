@@ -4,7 +4,7 @@ import threading
 import time
 import uuid
 
-from transcriber.config import MAX_SECONDS, MODEL_NAME, SAMPLE_RATE
+from transcriber.config import MAX_SECONDS, SAMPLE_RATE
 from transcriber.diagnostics import log_event
 from transcriber.insertion import WindowsInsertion, paste_text, safe_text
 from transcriber.microphones import MicrophoneError
@@ -215,7 +215,7 @@ class SessionController:
             self.session_id,
             "result",
             output_characters=len(text),
-            model=MODEL_NAME,
+            model=self.paths.model.name,
         )
         self.state = "inserting"
         target = self.target

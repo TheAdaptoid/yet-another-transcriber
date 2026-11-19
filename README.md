@@ -12,8 +12,8 @@ Behavior can differ with your microphone, apps, and shortcut assignments.
 
 ## What it does
 
-- Runs CPU-only [whisper.cpp](https://github.com/ggml-org/whisper.cpp) with the
-  `base.en` model and local Silero voice activity detection.
+- Runs CPU-only [whisper.cpp](https://github.com/ggml-org/whisper.cpp) with
+  `base.en` or `small.en` and local Silero voice activity detection.
 - Records one utterance at a time, up to 60 seconds.
 - Shows a corner indicator while recording and transcribing.
 - Checks the original window **and** focused element before pasting.
@@ -60,6 +60,25 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-vad.ps1
 
 If the terminal cannot find `yat`, run `uv tool update-shell`. Open a new terminal.
 Keep the checkout for asset setup and local updates.
+
+### Choose a speech model
+
+Existing installations use `base.en` by default. To try the larger `small.en`
+model, download and verify it once (approximately 466 MiB), then select it:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-small-model.ps1
+yat model list
+yat model select small.en
+yat stop
+yat start
+```
+
+Switch back with `yat model select base.en`, then stop and start YAT. Model
+selection applies on the next start. The selected model must be present and
+match its pinned hash or startup fails; `yat doctor` reports invalid assets.
+The larger model may take longer and is not guaranteed to improve every word.
+Both models run locally after setup.
 
 ## Run and dictate
 
